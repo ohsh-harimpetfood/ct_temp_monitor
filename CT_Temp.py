@@ -95,6 +95,8 @@ if uploaded_file is not None:
         var_name="컨테이너",
         value_name="온도"
     )
+    # 3단계 -1 데이터로거 신규추가에 따른 에러 제거 : ### → NaN
+    df_long["온도"] = df_long["온도"].replace("###", np.nan)    
     df_long["측정일시"] = pd.to_datetime(df_long["일자"].astype(str) + " " + df_long["시각"])
     # 결측치 개수 확인(숨기)
     #st.write("결측치 수:", df_long["온도"].isna().sum())
