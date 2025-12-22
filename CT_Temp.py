@@ -134,9 +134,15 @@ if uploaded_file is not None:
         
         # 적분값 계산 (0도 이하만 적분)
         mask = group["온도"] < 0
-        x = group.loc[mask, "시간(분)"]
-        y = 0 - group.loc[mask, "온도"]
-        측정면적 = np.trapz(y, x) if not x.empty else 0
+
+        # (안정성) 시간순 정렬 후 적분
+        tmp = group.loc[mask, ["시간(분)", "온도"]].sort_values("시간(분)")
+
+        x = tmp["시간(분)"]
+        y = 0 - tmp["온도"]
+
+        측정면적 = np.trapezoid(np.asarray(y), np.asarray(x)) if not x.empty else 0
+
     
         목표면적 = 18 * 전체시간 if 전체시간 > 0 else 0
         냉동효율 = 측정면적 / 목표면적 if 목표면적 > 0 else 0
