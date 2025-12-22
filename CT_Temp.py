@@ -13,7 +13,7 @@ import streamlit as st
 
 
 
-st.set_page_config(page_title="❄냉동 컨테이너 온도데이터 처리 프로그램", layout="wide")
+st.set_page_config(page_title="❄냉동 컨테이너 온도데이터 처리 프로그램.V2", layout="wide")
 
 # Step 1: 파일 업로드
 st.title("❄ 냉동 컨테이너 온도 데이터 처리 프로그램")
