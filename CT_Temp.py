@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
@@ -182,6 +183,7 @@ def preprocess_new_platform_csv(uploaded_file):
 # =========================================================
 # 요약 계산
 # =========================================================
+@st.cache_data(show_spinner=False)
 def calculate_summary(df_long):
     """
     컨테이너별 / 날짜별 분석결과 생성
@@ -287,6 +289,7 @@ def calculate_summary(df_long):
 # =========================================================
 # 날짜별 지표 요약 테이블 생성
 # =========================================================
+@st.cache_data(show_spinner=False)
 def build_metric_table(df_summary):
     """
     컨테이너별 날짜별 주요 지표 피벗 테이블 생성
@@ -405,16 +408,26 @@ def create_temperature_chart(plot_df, title, figsize=(10, 4)):
     return fig
 
 # =========================================================
-# 일자별 지표 비교 그래프 생성
+# 일자별 지표 비교 그래프 생성 - Plotly 반응형 버전
 # =========================================================
 def create_daily_metric_compare_chart(df_summary, selected_metric, selected_containers):
     """
-    선택한 지표를 기준으로 컨테이너별 일자 추이 라인 그래프 생성
+    선택한 지표를 기준으로 컨테이너별 일자 추이 Plotly 그래프 생성
 
     X축: 측정일자
     Y축: 선택 지표
     라인: 선택된 컨테이너
+
+    그래프 내부 문구는 한글 깨짐 방지를 위해 영문으로 표시
     """
+
+    metric_label_map = {
+        "최저온도": "Min Temperature (°C)",
+        "냉동효율(%)": "Freezing Efficiency (%)",
+        "-15℃이하유지율(%)": "Below -15°C Retention (%)"
+    }
+
+    selected_metric_label = metric_label_map.get(selected_metric, selected_metric)
 
     plot_df = df_summary[
         df_summary["컨테이너"].isin(selected_containers)
@@ -423,7 +436,7 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
     plot_df["측정일자"] = pd.to_datetime(plot_df["측정일자"])
     plot_df = plot_df.sort_values(["컨테이너", "측정일자"])
 
-    fig, ax = plt.subplots(figsize=(11, 4.5))
+    fig = go.Figure()
 
     for ct in sorted(selected_containers, key=ct_sort_key):
         ct_df = plot_df[plot_df["컨테이너"] == ct].copy()
@@ -431,42 +444,126 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
         if ct_df.empty:
             continue
 
-        ax.plot(
-            ct_df["측정일자"],
-            ct_df[selected_metric],
-            marker="o",
-            linewidth=1.5,
-            markersize=4,
-            label=ct
+        fig.add_trace(
+            go.Scatter(
+                x=ct_df["측정일자"],
+                y=ct_df[selected_metric],
+                mode="lines+markers",
+                name=ct,
+                line=dict(width=2),
+                marker=dict(size=6),
+                hovertemplate=(
+                    "Date: %{x|%Y-%m-%d}<br>"
+                    "Container: " + ct + "<br>"
+                    + selected_metric_label + ": %{y}<extra></extra>"
+                )
+            )
         )
 
-    ax.set_title(f"컨테이너별 일자별 {selected_metric} 추이", fontsize=12)
-    ax.set_xlabel("측정일자", fontsize=9)
-    ax.set_ylabel(selected_metric, fontsize=9)
-    ax.tick_params(axis="x", labelsize=8, rotation=30)
-    ax.tick_params(axis="y", labelsize=8)
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best", fontsize=8)
+    # 기준선
+    shapes = []
 
-    # 지표별 기준선 보조 표시
     if selected_metric == "-15℃이하유지율(%)":
-        ax.axhline(100, linestyle="--", linewidth=0.8)
-        ax.set_ylim(0, 105)
+        shapes.append({
+            "type": "line",
+            "xref": "paper",
+            "x0": 0,
+            "x1": 1,
+            "yref": "y",
+            "y0": 100,
+            "y1": 100,
+            "line": {
+                "dash": "dash",
+                "width": 1
+            }
+        })
+        y_range = [0, 105]
 
     elif selected_metric == "냉동효율(%)":
-        ax.axhline(100, linestyle="--", linewidth=0.8)
+        shapes.append({
+            "type": "line",
+            "xref": "paper",
+            "x0": 0,
+            "x1": 1,
+            "yref": "y",
+            "y0": 100,
+            "y1": 100,
+            "line": {
+                "dash": "dash",
+                "width": 1
+            }
+        })
+        y_range = None
 
     elif selected_metric == "최저온도":
-        ax.axhline(-15, linestyle=":", linewidth=0.8, label="-15℃")
-        ax.axhline(-18, linestyle="--", linewidth=0.8, label="-18℃")
-        ax.legend(loc="best", fontsize=8)
+        shapes.extend([
+            {
+                "type": "line",
+                "xref": "paper",
+                "x0": 0,
+                "x1": 1,
+                "yref": "y",
+                "y0": -15,
+                "y1": -15,
+                "line": {
+                    "dash": "dot",
+                    "width": 1
+                }
+            },
+            {
+                "type": "line",
+                "xref": "paper",
+                "x0": 0,
+                "x1": 1,
+                "yref": "y",
+                "y0": -18,
+                "y1": -18,
+                "line": {
+                    "dash": "dash",
+                    "width": 1
+                }
+            }
+        ])
+        y_range = None
 
-    fig.tight_layout()
+    else:
+        y_range = None
+
+    fig.update_layout(
+        title=f"Daily {selected_metric_label} Trend",
+        xaxis_title="Date",
+        yaxis_title=selected_metric_label,
+        height=460,
+        margin=dict(l=40, r=30, t=70, b=40),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        shapes=shapes
+    )
+
+    fig.update_xaxes(
+        tickformat="%m-%d",
+        showgrid=True
+    )
+
+    fig.update_yaxes(
+        showgrid=True
+    )
+
+    if y_range is not None:
+        fig.update_yaxes(range=y_range)
 
     return fig
-
-
-def build_selected_metric_pivot_table(df_summary, selected_metric, selected_containers):
+    
+@st.cache_data(show_spinner=False)
+def build_selected_metric_pivot_table(df_summary, selected_metric, selected_containers_tuple):
+    selected_containers = list(selected_containers_tuple)
+    
     """
     선택한 컨테이너와 지표 기준의 일자별 피벗 테이블 생성
     """
@@ -718,17 +815,23 @@ if uploaded_file is not None:
         st.dataframe(df_metric_table, use_container_width=True)
 
         # -------------------------------------------------
-        # 일자별 지표 비교 그래프
+        # 일자별 지표 비교 그래프 - compact button + Plotly
         # -------------------------------------------------
         st.divider()
         st.subheader("📈 일자별 지표 비교 그래프")
-        st.caption("지표와 컨테이너를 선택하면 일자별 추이 그래프가 즉시 반영됩니다.")
+        st.caption("지표와 컨테이너를 선택하면 일자별 추이 그래프가 반영됩니다. 그래프 내부 표기는 한글 깨짐 방지를 위해 영문으로 표시됩니다.")
 
         metric_options = [
             "최저온도",
             "냉동효율(%)",
             "-15℃이하유지율(%)"
         ]
+
+        metric_short_label = {
+            "최저온도": "최저온도",
+            "냉동효율(%)": "냉동효율(%)",
+            "-15℃이하유지율(%)": "-15℃ 유지율(%)"
+        }
 
         ct_list_for_metric = sorted(
             df_summary["컨테이너"].unique(),
@@ -737,32 +840,29 @@ if uploaded_file is not None:
 
         # session_state 초기화
         if "daily_selected_metric" not in st.session_state:
-            st.session_state.daily_selected_metric = "최저온도"
+            st.session_state.daily_selected_metric = "냉동효율(%)"
 
         if "daily_selected_containers" not in st.session_state:
-            # 기본값: 전체 컨테이너 선택
             st.session_state.daily_selected_containers = ct_list_for_metric.copy()
 
-        # 현재 파일에 없는 컨테이너가 session_state에 남아있을 경우 제거
+        # 현재 업로드 파일에 없는 컨테이너 제거
         st.session_state.daily_selected_containers = [
             ct for ct in st.session_state.daily_selected_containers
             if ct in ct_list_for_metric
         ]
 
-        # 선택된 컨테이너가 하나도 없으면 첫 번째 컨테이너 자동 선택
-        if not st.session_state.daily_selected_containers and ct_list_for_metric:
-            st.session_state.daily_selected_containers = [ct_list_for_metric[0]]
+        selected_metric = st.session_state.daily_selected_metric
 
         # -----------------------------
         # 지표 선택 버튼
         # -----------------------------
         st.markdown("#### 1) 지표 선택")
 
-        metric_cols = st.columns(len(metric_options))
+        metric_cols = st.columns(len(metric_options), gap="small")
 
         for idx, metric in enumerate(metric_options):
             is_selected = st.session_state.daily_selected_metric == metric
-            button_label = f"✅ {metric}" if is_selected else metric
+            button_label = f"✅ {metric_short_label[metric]}" if is_selected else metric_short_label[metric]
 
             with metric_cols[idx]:
                 if st.button(
@@ -771,60 +871,49 @@ if uploaded_file is not None:
                     use_container_width=True
                 ):
                     st.session_state.daily_selected_metric = metric
-                    st.rerun()
 
         selected_metric = st.session_state.daily_selected_metric
 
         # -----------------------------
-        # 컨테이너 선택 토글 버튼
+        # 컨테이너 선택 버튼
         # -----------------------------
         st.markdown("#### 2) 컨테이너 선택")
 
-        control_col1, control_col2, control_col3 = st.columns([1, 1, 4])
+        control_col1, control_col2, control_col3 = st.columns([1, 1, 4], gap="small")
 
         with control_col1:
             if st.button("전체 선택", use_container_width=True):
                 st.session_state.daily_selected_containers = ct_list_for_metric.copy()
-                st.rerun()
 
         with control_col2:
             if st.button("전체 해제", use_container_width=True):
                 st.session_state.daily_selected_containers = []
-                st.rerun()
 
         with control_col3:
-            selected_count = len(st.session_state.daily_selected_containers)
-            st.info(f"선택된 컨테이너: {selected_count}개")
+            st.caption(f"Selected containers: {len(st.session_state.daily_selected_containers)} / {len(ct_list_for_metric)}")
 
-        # CT 버튼은 한 줄에 너무 많이 몰리지 않도록 6개씩 배치
-        buttons_per_row = 6
+        # CT1~CT13을 한 줄에 최대한 compact하게 배치
+        ct_cols = st.columns(len(ct_list_for_metric), gap="small")
 
-        for start_idx in range(0, len(ct_list_for_metric), buttons_per_row):
-            row_cts = ct_list_for_metric[start_idx:start_idx + buttons_per_row]
-            ct_cols = st.columns(buttons_per_row)
+        for idx, ct in enumerate(ct_list_for_metric):
+            is_selected = ct in st.session_state.daily_selected_containers
+            button_label = f"{ct} ✓" if is_selected else ct
 
-            for idx, ct in enumerate(row_cts):
-                is_selected = ct in st.session_state.daily_selected_containers
-                button_label = f"✅ {ct}" if is_selected else ct
+            with ct_cols[idx]:
+                if st.button(
+                    button_label,
+                    key=f"ct_toggle_button_{ct}",
+                    use_container_width=True
+                ):
+                    if ct in st.session_state.daily_selected_containers:
+                        st.session_state.daily_selected_containers.remove(ct)
+                    else:
+                        st.session_state.daily_selected_containers.append(ct)
 
-                with ct_cols[idx]:
-                    if st.button(
-                        button_label,
-                        key=f"ct_toggle_button_{ct}",
-                        use_container_width=True
-                    ):
-                        if ct in st.session_state.daily_selected_containers:
-                            st.session_state.daily_selected_containers.remove(ct)
-                        else:
-                            st.session_state.daily_selected_containers.append(ct)
-
-                        # CT 숫자 기준으로 선택 목록 정렬
-                        st.session_state.daily_selected_containers = sorted(
-                            st.session_state.daily_selected_containers,
-                            key=ct_sort_key
-                        )
-
-                        st.rerun()
+                    st.session_state.daily_selected_containers = sorted(
+                        st.session_state.daily_selected_containers,
+                        key=ct_sort_key
+                    )
 
         selected_containers = st.session_state.daily_selected_containers
 
@@ -840,12 +929,19 @@ if uploaded_file is not None:
                 selected_containers=selected_containers
             )
 
-            st.pyplot(fig_daily_metric)
+            st.plotly_chart(
+                fig_daily_metric,
+                use_container_width=True,
+                config={
+                    "displayModeBar": True,
+                    "responsive": True
+                }
+            )
 
-            selected_metric_table = build_selected_metric_pivot_table(
+           selected_metric_table = build_selected_metric_pivot_table(
                 df_summary=df_summary,
                 selected_metric=selected_metric,
-                selected_containers=selected_containers
+                selected_containers_tuple=tuple(selected_containers)
             )
 
             st.markdown(f"#### 3) 선택 지표 테이블: {selected_metric}")
