@@ -404,6 +404,96 @@ def create_temperature_chart(plot_df, title, figsize=(10, 4)):
 
     return fig
 
+# =========================================================
+# 일자별 지표 비교 그래프 생성
+# =========================================================
+def create_daily_metric_compare_chart(df_summary, selected_metric, selected_containers):
+    """
+    선택한 지표를 기준으로 컨테이너별 일자 추이 라인 그래프 생성
+
+    X축: 측정일자
+    Y축: 선택 지표
+    라인: 선택된 컨테이너
+    """
+
+    plot_df = df_summary[
+        df_summary["컨테이너"].isin(selected_containers)
+    ].copy()
+
+    plot_df["측정일자"] = pd.to_datetime(plot_df["측정일자"])
+    plot_df = plot_df.sort_values(["컨테이너", "측정일자"])
+
+    fig, ax = plt.subplots(figsize=(11, 4.5))
+
+    for ct in sorted(selected_containers, key=ct_sort_key):
+        ct_df = plot_df[plot_df["컨테이너"] == ct].copy()
+
+        if ct_df.empty:
+            continue
+
+        ax.plot(
+            ct_df["측정일자"],
+            ct_df[selected_metric],
+            marker="o",
+            linewidth=1.5,
+            markersize=4,
+            label=ct
+        )
+
+    ax.set_title(f"컨테이너별 일자별 {selected_metric} 추이", fontsize=12)
+    ax.set_xlabel("측정일자", fontsize=9)
+    ax.set_ylabel(selected_metric, fontsize=9)
+    ax.tick_params(axis="x", labelsize=8, rotation=30)
+    ax.tick_params(axis="y", labelsize=8)
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best", fontsize=8)
+
+    # 지표별 기준선 보조 표시
+    if selected_metric == "-15℃이하유지율(%)":
+        ax.axhline(100, linestyle="--", linewidth=0.8)
+        ax.set_ylim(0, 105)
+
+    elif selected_metric == "냉동효율(%)":
+        ax.axhline(100, linestyle="--", linewidth=0.8)
+
+    elif selected_metric == "최저온도":
+        ax.axhline(-15, linestyle=":", linewidth=0.8, label="-15℃")
+        ax.axhline(-18, linestyle="--", linewidth=0.8, label="-18℃")
+        ax.legend(loc="best", fontsize=8)
+
+    fig.tight_layout()
+
+    return fig
+
+
+def build_selected_metric_pivot_table(df_summary, selected_metric, selected_containers):
+    """
+    선택한 컨테이너와 지표 기준의 일자별 피벗 테이블 생성
+    """
+
+    table_df = df_summary[
+        df_summary["컨테이너"].isin(selected_containers)
+    ].copy()
+
+    table_df["측정일자"] = pd.to_datetime(table_df["측정일자"])
+
+    pivot = table_df.pivot(
+        index="측정일자",
+        columns="컨테이너",
+        values=selected_metric
+    )
+
+    selected_containers_sorted = sorted(selected_containers, key=ct_sort_key)
+    pivot = pivot.reindex(columns=selected_containers_sorted)
+
+    pivot = pivot.sort_index()
+    pivot.index = pivot.index.strftime("%m월 %d일")
+
+    pivot_reset = pivot.reset_index()
+    pivot_reset.rename(columns={"측정일자": "측정일자"}, inplace=True)
+
+    return pivot_reset
+
 
 # =========================================================
 # 엑셀 다운로드 생성
@@ -627,6 +717,141 @@ if uploaded_file is not None:
         st.subheader("📊 컨테이너별 최저온도 / 냉동효율 / -15℃ 이하 유지율 요약 테이블")
         st.dataframe(df_metric_table, use_container_width=True)
 
+        # -------------------------------------------------
+        # 일자별 지표 비교 그래프
+        # -------------------------------------------------
+        st.divider()
+        st.subheader("📈 일자별 지표 비교 그래프")
+        st.caption("지표와 컨테이너를 선택하면 일자별 추이 그래프가 즉시 반영됩니다.")
+
+        metric_options = [
+            "최저온도",
+            "냉동효율(%)",
+            "-15℃이하유지율(%)"
+        ]
+
+        ct_list_for_metric = sorted(
+            df_summary["컨테이너"].unique(),
+            key=ct_sort_key
+        )
+
+        # session_state 초기화
+        if "daily_selected_metric" not in st.session_state:
+            st.session_state.daily_selected_metric = "최저온도"
+
+        if "daily_selected_containers" not in st.session_state:
+            # 기본값: 전체 컨테이너 선택
+            st.session_state.daily_selected_containers = ct_list_for_metric.copy()
+
+        # 현재 파일에 없는 컨테이너가 session_state에 남아있을 경우 제거
+        st.session_state.daily_selected_containers = [
+            ct for ct in st.session_state.daily_selected_containers
+            if ct in ct_list_for_metric
+        ]
+
+        # 선택된 컨테이너가 하나도 없으면 첫 번째 컨테이너 자동 선택
+        if not st.session_state.daily_selected_containers and ct_list_for_metric:
+            st.session_state.daily_selected_containers = [ct_list_for_metric[0]]
+
+        # -----------------------------
+        # 지표 선택 버튼
+        # -----------------------------
+        st.markdown("#### 1) 지표 선택")
+
+        metric_cols = st.columns(len(metric_options))
+
+        for idx, metric in enumerate(metric_options):
+            is_selected = st.session_state.daily_selected_metric == metric
+            button_label = f"✅ {metric}" if is_selected else metric
+
+            with metric_cols[idx]:
+                if st.button(
+                    button_label,
+                    key=f"metric_button_{metric}",
+                    use_container_width=True
+                ):
+                    st.session_state.daily_selected_metric = metric
+                    st.rerun()
+
+        selected_metric = st.session_state.daily_selected_metric
+
+        # -----------------------------
+        # 컨테이너 선택 토글 버튼
+        # -----------------------------
+        st.markdown("#### 2) 컨테이너 선택")
+
+        control_col1, control_col2, control_col3 = st.columns([1, 1, 4])
+
+        with control_col1:
+            if st.button("전체 선택", use_container_width=True):
+                st.session_state.daily_selected_containers = ct_list_for_metric.copy()
+                st.rerun()
+
+        with control_col2:
+            if st.button("전체 해제", use_container_width=True):
+                st.session_state.daily_selected_containers = []
+                st.rerun()
+
+        with control_col3:
+            selected_count = len(st.session_state.daily_selected_containers)
+            st.info(f"선택된 컨테이너: {selected_count}개")
+
+        # CT 버튼은 한 줄에 너무 많이 몰리지 않도록 6개씩 배치
+        buttons_per_row = 6
+
+        for start_idx in range(0, len(ct_list_for_metric), buttons_per_row):
+            row_cts = ct_list_for_metric[start_idx:start_idx + buttons_per_row]
+            ct_cols = st.columns(buttons_per_row)
+
+            for idx, ct in enumerate(row_cts):
+                is_selected = ct in st.session_state.daily_selected_containers
+                button_label = f"✅ {ct}" if is_selected else ct
+
+                with ct_cols[idx]:
+                    if st.button(
+                        button_label,
+                        key=f"ct_toggle_button_{ct}",
+                        use_container_width=True
+                    ):
+                        if ct in st.session_state.daily_selected_containers:
+                            st.session_state.daily_selected_containers.remove(ct)
+                        else:
+                            st.session_state.daily_selected_containers.append(ct)
+
+                        # CT 숫자 기준으로 선택 목록 정렬
+                        st.session_state.daily_selected_containers = sorted(
+                            st.session_state.daily_selected_containers,
+                            key=ct_sort_key
+                        )
+
+                        st.rerun()
+
+        selected_containers = st.session_state.daily_selected_containers
+
+        # -----------------------------
+        # 그래프 및 테이블 출력
+        # -----------------------------
+        if not selected_containers:
+            st.warning("그래프를 표시하려면 컨테이너를 1개 이상 선택해 주세요.")
+        else:
+            fig_daily_metric = create_daily_metric_compare_chart(
+                df_summary=df_summary,
+                selected_metric=selected_metric,
+                selected_containers=selected_containers
+            )
+
+            st.pyplot(fig_daily_metric)
+
+            selected_metric_table = build_selected_metric_pivot_table(
+                df_summary=df_summary,
+                selected_metric=selected_metric,
+                selected_containers=selected_containers
+            )
+
+            st.markdown(f"#### 3) 선택 지표 테이블: {selected_metric}")
+            st.dataframe(selected_metric_table, use_container_width=True)
+    
+    
     except Exception as e:
         st.error("CSV 처리 중 오류가 발생했습니다.")
         st.exception(e)
