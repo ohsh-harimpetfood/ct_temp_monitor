@@ -938,7 +938,7 @@ if uploaded_file is not None:
                 }
             )
 
-           selected_metric_table = build_selected_metric_pivot_table(
+            selected_metric_table = build_selected_metric_pivot_table(
                 df_summary=df_summary,
                 selected_metric=selected_metric,
                 selected_containers_tuple=tuple(selected_containers)
