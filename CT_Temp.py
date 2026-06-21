@@ -103,10 +103,8 @@ def preprocess_new_platform_csv(uploaded_file):
     if df_raw.empty:
         raise ValueError("CSV 파일에 데이터가 없습니다.")
 
-    # 첫 번째 컬럼은 측정일시 컬럼
     timestamp_col = df_raw.columns[0]
 
-    # 냉동CT 컬럼 탐색 및 CT명 표준화
     ct_rename = {}
 
     for col in df_raw.columns[1:]:
@@ -119,17 +117,13 @@ def preprocess_new_platform_csv(uploaded_file):
 
     df = df_raw.rename(columns={timestamp_col: "측정일시", **ct_rename})
 
-    # 측정일시 변환
     df["측정일시"] = pd.to_datetime(df["측정일시"], errors="coerce")
     df = df.dropna(subset=["측정일시"]).copy()
 
-    # CT 컬럼 숫자 기준 정렬
     ct_cols = sorted(ct_rename.values(), key=ct_sort_key)
 
-    # 필요한 컬럼만 사용
     df = df[["측정일시"] + ct_cols].copy()
 
-    # long-format 변환
     df_long = pd.melt(
         df,
         id_vars=["측정일시"],
@@ -138,10 +132,8 @@ def preprocess_new_platform_csv(uploaded_file):
         value_name="온도"
     )
 
-    # 온도 숫자 변환
     df_long["온도"] = pd.to_numeric(df_long["온도"], errors="coerce")
 
-    # 이상값 판정: -50℃ 미만, 60℃ 초과
     abnormal_mask = df_long["온도"].lt(-50) | df_long["온도"].gt(60)
 
     df_abnormal = (
@@ -153,16 +145,12 @@ def preprocess_new_platform_csv(uploaded_file):
 
     abnormal_count = int(abnormal_mask.sum())
 
-    # 이상값은 결측치로 대체
     df_long.loc[abnormal_mask, "온도"] = np.nan
 
-    # 결측치 수 확인
     missing_count_after_replace = int(df_long["온도"].isna().sum())
 
-    # 분석용 데이터에서는 결측 제거
     df_long = df_long.dropna(subset=["온도"]).copy()
 
-    # 분석용 파생 컬럼
     df_long["측정일자"] = df_long["측정일시"].dt.date
     df_long["시각"] = df_long["측정일시"].dt.strftime("%H:%M:%S")
     df_long["요일"] = df_long["측정일시"].dt.day_name()
@@ -197,7 +185,7 @@ def calculate_summary(df_long):
 
     신규 추가:
     - -15℃ 이하 유지율(%)
-      현재 기준은 유효 측정건수 중 온도 <= -15℃ 비율
+      유효 측정건수 중 온도 <= -15℃ 비율
     """
 
     summary_list = []
@@ -225,7 +213,6 @@ def calculate_summary(df_long):
         목표면적 = 18 * 전체시간 if 전체시간 > 0 else 0
         냉동효율 = 측정면적 / 목표면적 if 목표면적 > 0 else 0
 
-        # 신규 지표: -15℃ 이하 유지율
         영하15유지율 = (group["온도"] <= -15).mean() if len(group) > 0 else np.nan
 
         summary_list.append({
@@ -246,7 +233,6 @@ def calculate_summary(df_long):
     if df_summary.empty:
         return df_summary
 
-    # 요일 한글 변환
     df_summary["요일"] = df_summary["요일"].map({
         "Monday": "월요일",
         "Tuesday": "화요일",
@@ -257,7 +243,6 @@ def calculate_summary(df_long):
         "Sunday": "일요일"
     })
 
-    # 타입 정리
     int_cols = ["측정면적", "목표면적", "냉동효율(%)", "측정건수"]
 
     for col in int_cols:
@@ -267,7 +252,6 @@ def calculate_summary(df_long):
     df_summary["평균누적온도"] = df_summary["평균누적온도"].round(1)
     df_summary["-15℃이하유지율(%)"] = df_summary["-15℃이하유지율(%)"].round(1)
 
-    # CT 숫자 기준 정렬
     ct_order = sorted(df_summary["컨테이너"].unique(), key=ct_sort_key)
     df_summary["컨테이너"] = pd.Categorical(
         df_summary["컨테이너"],
@@ -325,7 +309,6 @@ def build_metric_table(df_summary):
 
     df_final = pd.concat(result_blocks, axis=0)
 
-    # 날짜 컬럼명 포맷 변경
     new_columns = []
 
     for col in df_final.columns:
@@ -336,7 +319,6 @@ def build_metric_table(df_summary):
 
     df_final.columns = new_columns
 
-    # 정렬
     df_final["컨테이너정렬키"] = df_final["컨테이너"].apply(ct_sort_key)
 
     metric_order = {
@@ -358,11 +340,12 @@ def build_metric_table(df_summary):
 
 
 # =========================================================
-# 그래프 생성
+# 온도 추이 그래프 생성 - 엑셀 삽입 및 단일 CT 확인용
 # =========================================================
 def create_temperature_chart(plot_df, title, figsize=(10, 4)):
     """
     온도 추이 그래프 생성
+    그래프 내부 문구는 영문으로 표시
     """
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -379,12 +362,10 @@ def create_temperature_chart(plot_df, title, figsize=(10, 4)):
         linewidth=1
     )
 
-    # 기준선
     ax.axhline(0, color="red", linestyle="--", linewidth=1, label="0°C")
     ax.axhline(-15, color="green", linestyle=":", linewidth=1, label="-15°C")
     ax.axhline(-18, color="blue", linestyle="--", linewidth=1, label="-18°C")
 
-    # 기존 냉동효율 계산 기준 영역: 온도 < 0
     ax.fill_between(
         plot_df["측정일시"],
         plot_df["온도"],
@@ -407,6 +388,113 @@ def create_temperature_chart(plot_df, title, figsize=(10, 4)):
 
     return fig
 
+
+# =========================================================
+# 일자별 지표 비교 - 상태 판정 / 요약 / 스타일 함수
+# =========================================================
+def get_metric_status(selected_metric, value):
+    """
+    선택 지표별 상태 판정
+
+    기준:
+    - 최저온도: -15℃ 초과 시 Check
+    - 냉동효율(%): 70% 미만 Low, 120% 초과 High
+    - -15℃이하유지율(%): 90% 미만 Check
+    """
+
+    if pd.isna(value):
+        return "Missing"
+
+    if selected_metric == "최저온도":
+        if value > -15:
+            return "Check"
+        return "OK"
+
+    if selected_metric == "냉동효율(%)":
+        if value < 70:
+            return "Low"
+        if value > 120:
+            return "High"
+        return "OK"
+
+    if selected_metric == "-15℃이하유지율(%)":
+        if value < 90:
+            return "Check"
+        return "OK"
+
+    return "OK"
+
+
+def get_metric_warning_df(df_summary, selected_metric, selected_containers):
+    """
+    선택 지표 기준 주의 데이터만 추출
+    """
+
+    warning_df = df_summary[
+        df_summary["컨테이너"].isin(selected_containers)
+    ].copy()
+
+    warning_df["측정일자"] = pd.to_datetime(warning_df["측정일자"])
+    warning_df["상태"] = warning_df[selected_metric].apply(
+        lambda x: get_metric_status(selected_metric, x)
+    )
+
+    warning_df = warning_df[warning_df["상태"] != "OK"].copy()
+
+    if warning_df.empty:
+        return warning_df
+
+    warning_df = warning_df[
+        ["컨테이너", "측정일자", selected_metric, "상태"]
+    ].copy()
+
+    if selected_metric == "최저온도":
+        warning_df = warning_df.sort_values(selected_metric, ascending=False)
+    elif selected_metric == "냉동효율(%)":
+        warning_df["범위이탈정도"] = warning_df[selected_metric].apply(
+            lambda x: 70 - x if x < 70 else x - 120
+        )
+        warning_df = warning_df.sort_values("범위이탈정도", ascending=False)
+        warning_df = warning_df.drop(columns=["범위이탈정도"])
+    elif selected_metric == "-15℃이하유지율(%)":
+        warning_df = warning_df.sort_values(selected_metric, ascending=True)
+    else:
+        warning_df = warning_df.sort_values(["컨테이너", "측정일자"])
+
+    warning_df["측정일자"] = warning_df["측정일자"].dt.strftime("%Y-%m-%d")
+
+    return warning_df.reset_index(drop=True)
+
+
+def style_selected_metric_table(df, selected_metric):
+    """
+    선택 지표 피벗 테이블 스타일 적용
+    - 주의값은 글자색 강조 + 굵게
+    """
+
+    def style_cell(value):
+        if not isinstance(value, (int, float, np.integer, np.floating)):
+            return ""
+
+        status = get_metric_status(selected_metric, value)
+
+        if status == "OK":
+            return ""
+
+        if status == "Low":
+            return "color: #d97706; font-weight: 700;"
+
+        if status == "High":
+            return "color: #9333ea; font-weight: 700;"
+
+        if status == "Check":
+            return "color: #dc2626; font-weight: 700;"
+
+        return ""
+
+    return df.style.map(style_cell)
+
+
 # =========================================================
 # 일자별 지표 비교 그래프 생성 - Plotly 반응형 버전
 # =========================================================
@@ -419,6 +507,7 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
     라인: 선택된 컨테이너
 
     그래프 내부 문구는 한글 깨짐 방지를 위해 영문으로 표시
+    기준 이탈 포인트는 별도 마커로 강조
     """
 
     metric_label_map = {
@@ -444,6 +533,10 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
         if ct_df.empty:
             continue
 
+        ct_df["Status"] = ct_df[selected_metric].apply(
+            lambda x: get_metric_status(selected_metric, x)
+        )
+
         fig.add_trace(
             go.Scatter(
                 x=ct_df["측정일자"],
@@ -452,16 +545,58 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
                 name=ct,
                 line=dict(width=2),
                 marker=dict(size=6),
+                customdata=np.stack(
+                    [
+                        ct_df["컨테이너"],
+                        ct_df["Status"]
+                    ],
+                    axis=-1
+                ),
                 hovertemplate=(
+                    "<b>Container: %{customdata[0]}</b><br>"
                     "Date: %{x|%Y-%m-%d}<br>"
-                    "Container: " + ct + "<br>"
-                    + selected_metric_label + ": %{y}<extra></extra>"
+                    + selected_metric_label + ": %{y}<br>"
+                    "Status: %{customdata[1]}"
+                    "<extra></extra>"
                 )
             )
         )
 
-    # 기준선
+        check_df = ct_df[ct_df["Status"] != "OK"].copy()
+
+        if not check_df.empty:
+            fig.add_trace(
+                go.Scatter(
+                    x=check_df["측정일자"],
+                    y=check_df[selected_metric],
+                    mode="markers",
+                    name=f"{ct} Check",
+                    marker=dict(
+                        size=12,
+                        symbol="x",
+                        line=dict(width=2)
+                    ),
+                    showlegend=False,
+                    customdata=np.stack(
+                        [
+                            check_df["컨테이너"],
+                            check_df["Status"]
+                        ],
+                        axis=-1
+                    ),
+                    hovertemplate=(
+                        "<b>CHECK POINT</b><br>"
+                        "Container: %{customdata[0]}<br>"
+                        "Date: %{x|%Y-%m-%d}<br>"
+                        + selected_metric_label + ": %{y}<br>"
+                        "Status: %{customdata[1]}"
+                        "<extra></extra>"
+                    )
+                )
+            )
+
     shapes = []
+    annotations = []
 
     if selected_metric == "-15℃이하유지율(%)":
         shapes.append({
@@ -470,29 +605,76 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
             "x0": 0,
             "x1": 1,
             "yref": "y",
-            "y0": 100,
-            "y1": 100,
+            "y0": 90,
+            "y1": 90,
             "line": {
                 "dash": "dash",
                 "width": 1
             }
+        })
+        annotations.append({
+            "xref": "paper",
+            "x": 1,
+            "yref": "y",
+            "y": 90,
+            "text": "90% threshold",
+            "showarrow": False,
+            "xanchor": "left",
+            "font": {"size": 11}
         })
         y_range = [0, 105]
 
     elif selected_metric == "냉동효율(%)":
-        shapes.append({
-            "type": "line",
-            "xref": "paper",
-            "x0": 0,
-            "x1": 1,
-            "yref": "y",
-            "y0": 100,
-            "y1": 100,
-            "line": {
-                "dash": "dash",
-                "width": 1
+        shapes.extend([
+            {
+                "type": "line",
+                "xref": "paper",
+                "x0": 0,
+                "x1": 1,
+                "yref": "y",
+                "y0": 70,
+                "y1": 70,
+                "line": {
+                    "dash": "dash",
+                    "width": 1
+                }
+            },
+            {
+                "type": "line",
+                "xref": "paper",
+                "x0": 0,
+                "x1": 1,
+                "yref": "y",
+                "y0": 120,
+                "y1": 120,
+                "line": {
+                    "dash": "dash",
+                    "width": 1
+                }
             }
-        })
+        ])
+        annotations.extend([
+            {
+                "xref": "paper",
+                "x": 1,
+                "yref": "y",
+                "y": 70,
+                "text": "70% lower limit",
+                "showarrow": False,
+                "xanchor": "left",
+                "font": {"size": 11}
+            },
+            {
+                "xref": "paper",
+                "x": 1,
+                "yref": "y",
+                "y": 120,
+                "text": "120% upper limit",
+                "showarrow": False,
+                "xanchor": "left",
+                "font": {"size": 11}
+            }
+        ])
         y_range = None
 
     elif selected_metric == "최저온도":
@@ -524,6 +706,28 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
                 }
             }
         ])
+        annotations.extend([
+            {
+                "xref": "paper",
+                "x": 1,
+                "yref": "y",
+                "y": -15,
+                "text": "-15°C threshold",
+                "showarrow": False,
+                "xanchor": "left",
+                "font": {"size": 11}
+            },
+            {
+                "xref": "paper",
+                "x": 1,
+                "yref": "y",
+                "y": -18,
+                "text": "-18°C target",
+                "showarrow": False,
+                "xanchor": "left",
+                "font": {"size": 11}
+            }
+        ])
         y_range = None
 
     else:
@@ -534,8 +738,8 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
         xaxis_title="Date",
         yaxis_title=selected_metric_label,
         height=460,
-        margin=dict(l=40, r=30, t=70, b=40),
-        hovermode="x unified",
+        margin=dict(l=40, r=110, t=70, b=40),
+        hovermode="closest",
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -543,7 +747,8 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
             xanchor="right",
             x=1
         ),
-        shapes=shapes
+        shapes=shapes,
+        annotations=annotations
     )
 
     fig.update_xaxes(
@@ -559,14 +764,15 @@ def create_daily_metric_compare_chart(df_summary, selected_metric, selected_cont
         fig.update_yaxes(range=y_range)
 
     return fig
-    
+
+
 @st.cache_data(show_spinner=False)
 def build_selected_metric_pivot_table(df_summary, selected_metric, selected_containers_tuple):
-    selected_containers = list(selected_containers_tuple)
-    
     """
     선택한 컨테이너와 지표 기준의 일자별 피벗 테이블 생성
     """
+
+    selected_containers = list(selected_containers_tuple)
 
     table_df = df_summary[
         df_summary["컨테이너"].isin(selected_containers)
@@ -725,14 +931,22 @@ if uploaded_file is not None:
             st.metric("결측 포함 총 제외 건수", f"{missing_count_after_replace:,}건")
 
         if abnormal_count > 0:
-            with st.expander("⚠️ 이상값 목록 확인 (-50℃ 미만 또는 60℃ 초과)"):
-                st.dataframe(df_abnormal, use_container_width=True)
+            with st.expander("⚠️ 이상값 목록 확인 (-50℃ 미만 또는 60℃ 초과)", expanded=False):
+                st.dataframe(
+                    df_abnormal,
+                    use_container_width=True,
+                    height=220
+                )
 
         # -------------------------------------------------
         # 요약표 출력
         # -------------------------------------------------
         st.subheader("📊 컨테이너별 날짜별 분석결과")
-        st.dataframe(df_summary, use_container_width=True, height=500)
+        st.dataframe(
+            df_summary,
+            use_container_width=True,
+            height=420
+        )
 
         # -------------------------------------------------
         # 엑셀 다운로드
@@ -756,7 +970,7 @@ if uploaded_file is not None:
         )
 
         # -------------------------------------------------
-        # 그래프 출력
+        # 단일 컨테이너 온도 추이 그래프
         # -------------------------------------------------
         st.subheader("📈 온도 추이 그래프")
 
@@ -809,10 +1023,14 @@ if uploaded_file is not None:
                 st.pyplot(fig)
 
         # -------------------------------------------------
-        # 날짜별 지표 요약 테이블
+        # 전체 지표 피벗 테이블은 접어서 표시
         # -------------------------------------------------
-        st.subheader("📊 컨테이너별 최저온도 / 냉동효율 / -15℃ 이하 유지율 요약 테이블")
-        st.dataframe(df_metric_table, use_container_width=True)
+        with st.expander("📊 컨테이너별 최저온도 / 냉동효율 / -15℃ 이하 유지율 요약 테이블 보기", expanded=False):
+            st.dataframe(
+                df_metric_table,
+                use_container_width=True,
+                height=280
+            )
 
         # -------------------------------------------------
         # 일자별 지표 비교 그래프 - compact button + Plotly
@@ -890,9 +1108,11 @@ if uploaded_file is not None:
                 st.session_state.daily_selected_containers = []
 
         with control_col3:
-            st.caption(f"Selected containers: {len(st.session_state.daily_selected_containers)} / {len(ct_list_for_metric)}")
+            st.caption(
+                f"Selected containers: {len(st.session_state.daily_selected_containers)} / {len(ct_list_for_metric)}"
+            )
 
-        # CT1~CT13을 한 줄에 최대한 compact하게 배치
+        # CT1~CT13 한 줄 compact 배치
         ct_cols = st.columns(len(ct_list_for_metric), gap="small")
 
         for idx, ct in enumerate(ct_list_for_metric):
@@ -923,6 +1143,70 @@ if uploaded_file is not None:
         if not selected_containers:
             st.warning("그래프를 표시하려면 컨테이너를 1개 이상 선택해 주세요.")
         else:
+            warning_df = get_metric_warning_df(
+                df_summary=df_summary,
+                selected_metric=selected_metric,
+                selected_containers=selected_containers
+            )
+
+            # -----------------------------
+            # 주의 데이터 요약 카드
+            # -----------------------------
+            st.markdown("#### 3) 주의 데이터 요약")
+
+            if warning_df.empty:
+                st.success("✅ 선택한 지표 기준으로 주의 데이터가 없습니다.")
+            else:
+                warning_count = len(warning_df)
+                warning_ct_count = warning_df["컨테이너"].nunique()
+
+                if selected_metric == "최저온도":
+                    worst_row = warning_df.sort_values(selected_metric, ascending=False).iloc[0]
+                    worst_label = "Highest min temp"
+
+                elif selected_metric == "냉동효율(%)":
+                    tmp_warning = warning_df.copy()
+                    tmp_warning["범위이탈정도"] = tmp_warning[selected_metric].apply(
+                        lambda x: 70 - x if x < 70 else x - 120
+                    )
+                    worst_row = tmp_warning.sort_values("범위이탈정도", ascending=False).iloc[0]
+                    worst_label = "Largest efficiency deviation"
+
+                elif selected_metric == "-15℃이하유지율(%)":
+                    worst_row = warning_df.sort_values(selected_metric, ascending=True).iloc[0]
+                    worst_label = "Lowest retention"
+
+                else:
+                    worst_row = warning_df.iloc[0]
+                    worst_label = "Worst point"
+
+                card1, card2, card3, card4 = st.columns(4)
+
+                with card1:
+                    st.metric("주의 데이터", f"{warning_count:,}건")
+
+                with card2:
+                    st.metric("주의 컨테이너", f"{warning_ct_count:,}개")
+
+                with card3:
+                    st.metric("대표 컨테이너", str(worst_row["컨테이너"]))
+
+                with card4:
+                    st.metric(worst_label, f"{worst_row[selected_metric]}")
+
+                st.caption(
+                    f"대표 일자: {worst_row['측정일자']} / 상태: {worst_row['상태']}"
+                )
+
+                st.dataframe(
+                    warning_df,
+                    use_container_width=True,
+                    height=180
+                )
+
+            # -----------------------------
+            # Plotly 그래프
+            # -----------------------------
             fig_daily_metric = create_daily_metric_compare_chart(
                 df_summary=df_summary,
                 selected_metric=selected_metric,
@@ -938,16 +1222,27 @@ if uploaded_file is not None:
                 }
             )
 
+            # -----------------------------
+            # 전체 피벗 테이블은 접어서 표시
+            # -----------------------------
             selected_metric_table = build_selected_metric_pivot_table(
                 df_summary=df_summary,
                 selected_metric=selected_metric,
                 selected_containers_tuple=tuple(selected_containers)
             )
 
-            st.markdown(f"#### 3) 선택 지표 테이블: {selected_metric}")
-            st.dataframe(selected_metric_table, use_container_width=True)
-    
-    
+            with st.expander(f"전체 피벗 테이블 보기: {selected_metric}", expanded=False):
+                styled_metric_table = style_selected_metric_table(
+                    selected_metric_table,
+                    selected_metric
+                )
+
+                st.dataframe(
+                    styled_metric_table,
+                    use_container_width=True,
+                    height=260
+                )
+
     except Exception as e:
         st.error("CSV 처리 중 오류가 발생했습니다.")
         st.exception(e)
