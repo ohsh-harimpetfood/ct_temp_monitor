@@ -230,7 +230,11 @@ def get_metric_flags(row):
     retention = row["-15℃이하유지율(%)"]
 
     temp_off = pd.notna(min_temp) and min_temp >= -16
-    eff_off = pd.notna(eff) and (eff < 70 or eff > 120)
+
+    eff_low = pd.notna(eff) and eff < 70
+    eff_high = pd.notna(eff) and eff > 120
+    eff_off = eff_low or eff_high
+
     retention_off = pd.notna(retention) and retention <= 70
     eff_emergency = pd.notna(eff) and eff <= 60
 
@@ -241,7 +245,7 @@ def get_metric_flags(row):
     if temp_off:
         issues.append(f"최저온도 {min_temp:.1f}℃")
     if eff_off:
-        if eff < 70:
+        if eff_low:
             issues.append(f"냉동효율 저하 {eff:.1f}%")
         else:
             issues.append(f"냉동효율 과다 {eff:.1f}%")
@@ -254,6 +258,8 @@ def get_metric_flags(row):
     return {
         "temp_off": temp_off,
         "eff_off": eff_off,
+        "eff_low": eff_low,
+        "eff_high": eff_high,
         "retention_off": retention_off,
         "eff_emergency": eff_emergency,
         "off_count": off_count,
@@ -267,12 +273,15 @@ def evaluate_daily_status(row):
     if flags["off_count"] == 0:
         status = "정상"
         score = 0
+
     elif flags["eff_emergency"] or flags["off_count"] >= 2:
         status = "긴급점검"
         score = 3
-    elif flags["off_count"] == 3:
-        status = "위험"
-        score = 2
+
+    elif flags["off_count"] == 1 and flags["eff_high"]:
+        status = "과냉주의"
+        score = 1
+
     else:
         status = "주의"
         score = 1
@@ -304,15 +313,6 @@ def calculate_deviation_score(row):
 
 @st.cache_data(show_spinner=False)
 def build_status_tables(df_summary, today):
-    """
-    V4 대시보드용 상태 테이블 생성
-
-    핵심:
-    - 상단 카드/우선점검 리스트는 today 기준 최근 3일만 사용
-    - 히트맵은 전체 분석 날짜 사용
-    - today 데이터가 없는 컨테이너는 데이터 연결 이상
-    """
-
     daily_status_all = df_summary.copy()
     daily_status_all["측정일자_dt"] = pd.to_datetime(daily_status_all["측정일자"])
 
@@ -385,7 +385,6 @@ def build_status_tables(df_summary, today):
             continue
 
         today_record = today_row.iloc[0]
-
         today_flags = get_metric_flags(today_record)
         today_off_count = today_flags["off_count"]
 
@@ -400,7 +399,6 @@ def build_status_tables(df_summary, today):
             and int(recent_two["이탈수"].sum()) == 0
         )
 
-        # 컨테이너 종합 상태 판정 우선순위
         if today_flags["eff_emergency"] or today_off_count >= 2:
             status = "긴급점검"
             status_score = 3
@@ -411,6 +409,11 @@ def build_status_tables(df_summary, today):
             status_score = 2
             risk_row = ct_recent[ct_recent["이탈수"] == 3].sort_values("측정일자_dt", ascending=False).iloc[0]
             대표이슈 = risk_row["이슈"]
+
+        elif today_off_count == 1 and today_flags["eff_high"]:
+            status = "과냉주의"
+            status_score = 1
+            대표이슈 = today_flags["issues"]
 
         elif recent_total_off == 0:
             status = "정상"
@@ -461,7 +464,7 @@ def build_status_tables(df_summary, today):
         })
 
         if status != "정상":
-            check_source = today_record if status == "긴급점검" else ct_recent.sort_values(["상태점수", "이탈정도"], ascending=[False, False]).iloc[0]
+            check_source = today_record if status in ["긴급점검", "과냉주의"] else ct_recent.sort_values(["상태점수", "이탈정도"], ascending=[False, False]).iloc[0]
 
             check_rows.append({
                 "상태": status,
@@ -523,6 +526,14 @@ def status_color(status):
             "border": "#ef4444",
             "text": "#fecaca",
             "badge": "#ef4444"
+        }
+
+    if status == "과냉주의":
+        return {
+            "bg": "#0b1f3a",
+            "border": "#3b82f6",
+            "text": "#dbeafe",
+            "badge": "#2563eb"
         }
 
     if status == "주의":
@@ -626,6 +637,7 @@ def render_v4_summary_dashboard(
     total_ct = len(container_status_df)
     emergency_count = int((container_status_df["종합상태"] == "긴급점검").sum())
     danger_count = int((container_status_df["종합상태"] == "위험").sum())
+    overcool_count = int((container_status_df["종합상태"] == "과냉주의").sum())
     caution_count = int((container_status_df["종합상태"] == "주의").sum())
     normal_count = int((container_status_df["종합상태"] == "정상").sum())
     connection_count = int((container_status_df["종합상태"] == "데이터 연결 이상").sum())
@@ -638,7 +650,7 @@ def render_v4_summary_dashboard(
         worst_ct = "-"
         worst_issue = "점검 대상 없음"
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
     with c1:
         st.metric("전체", f"{total_ct}개")
@@ -647,10 +659,12 @@ def render_v4_summary_dashboard(
     with c3:
         st.metric("주의", f"{caution_count}개")
     with c4:
-        st.metric("위험", f"{danger_count}개")
+        st.metric("과냉주의", f"{overcool_count}개")
     with c5:
-        st.metric("긴급점검", f"{emergency_count}개")
+        st.metric("위험", f"{danger_count}개")
     with c6:
+        st.metric("긴급점검", f"{emergency_count}개")
+    with c7:
         st.metric("연결 이상", f"{connection_count}개")
 
     st.caption(
@@ -705,9 +719,10 @@ def create_container_heatmap(daily_status_df, heatmap_metric):
         status_score = {
             "정상": 0,
             "주의": 1,
-            "위험": 2,
-            "긴급점검": 3,
-            "데이터없음": 4
+            "과냉주의": 2,
+            "위험": 3,
+            "긴급점검": 4,
+            "데이터없음": 5
         }
 
         z_df = (
@@ -737,22 +752,24 @@ def create_container_heatmap(daily_status_df, heatmap_metric):
                 ygap=2,
                 colorscale=[
                     [0.00, "#22c55e"],  # Normal
-                    [0.19, "#22c55e"],
-                    [0.20, "#f59e0b"],  # Caution
-                    [0.39, "#f59e0b"],
-                    [0.40, "#ef4444"],  # Risk
-                    [0.59, "#ef4444"],
-                    [0.60, "#7f1d1d"],  # Emergency - dark red
-                    [0.79, "#7f1d1d"],
-                    [0.80, "#6b7280"],  # No data
+                    [0.16, "#22c55e"],
+                    [0.17, "#f59e0b"],  # Caution
+                    [0.32, "#f59e0b"],
+                    [0.33, "#2563eb"],  # Overcool caution
+                    [0.49, "#2563eb"],
+                    [0.50, "#ef4444"],  # Risk
+                    [0.66, "#ef4444"],
+                    [0.67, "#7f1d1d"],  # Emergency
+                    [0.83, "#7f1d1d"],
+                    [0.84, "#6b7280"],  # No data
                     [1.00, "#6b7280"],
                 ],
                 zmin=0,
-                zmax=4,
+                zmax=5,
                 colorbar=dict(
                     title="Status",
-                    tickvals=[0, 1, 2, 3, 4],
-                    ticktext=["Normal", "Caution", "Risk", "Emergency", "No data"]
+                    tickvals=[0, 1, 2, 3, 4, 5],
+                    ticktext=["Normal", "Caution", "Overcool", "Risk", "Emergency", "No data"]
                 ),
                 hovertemplate=(
                     "Container: %{y}<br>"
@@ -1333,9 +1350,6 @@ if uploaded_file is not None:
 
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
-        # -------------------------------------------------
-        # V4 상단 대시보드
-        # -------------------------------------------------
         render_v4_summary_dashboard(
             daily_status_df=daily_status_df,
             recent_df=recent_df,
@@ -1347,9 +1361,6 @@ if uploaded_file is not None:
             dashboard_today=dashboard_today
         )
 
-        # -------------------------------------------------
-        # 기존 상세 분석 영역
-        # -------------------------------------------------
         st.divider()
         st.header("📋 기존 상세 분석 영역")
         st.caption("기존 부서별 확인 방식은 아래에 그대로 유지했습니다.")
@@ -1417,9 +1428,6 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        # -------------------------------------------------
-        # 온도 추이 그래프
-        # -------------------------------------------------
         st.subheader("📈 온도 추이 그래프")
 
         col1, col2 = st.columns([1, 5])
@@ -1470,9 +1478,6 @@ if uploaded_file is not None:
             with col2:
                 st.pyplot(fig)
 
-        # -------------------------------------------------
-        # 날짜별 지표 요약 테이블
-        # -------------------------------------------------
         st.subheader("📊 컨테이너별 최저온도 / 냉동효율 / -15℃ 이하 유지율 요약 테이블")
         st.caption(
             "표시 기준: 최저온도 -16℃ 이상 빨간색 / "
@@ -1488,9 +1493,6 @@ if uploaded_file is not None:
             height=320
         )
 
-        # -------------------------------------------------
-        # 일자별 지표 비교 그래프
-        # -------------------------------------------------
         st.divider()
         st.subheader("📈 일자별 지표 비교 그래프")
         st.caption("커서를 그래프의 선 또는 점에 올리면 해당 컨테이너 정보만 표시됩니다.")
