@@ -736,15 +736,15 @@ def create_container_heatmap(daily_status_df, heatmap_metric):
                 xgap=2,
                 ygap=2,
                 colorscale=[
-                    [0.00, "#22c55e"],
+                    [0.00, "#22c55e"],  # Normal
                     [0.19, "#22c55e"],
-                    [0.20, "#f59e0b"],
+                    [0.20, "#f59e0b"],  # Caution
                     [0.39, "#f59e0b"],
-                    [0.40, "#ef4444"],
+                    [0.40, "#ef4444"],  # Risk
                     [0.59, "#ef4444"],
-                    [0.60, "#a855f7"],
-                    [0.79, "#a855f7"],
-                    [0.80, "#6b7280"],
+                    [0.60, "#7f1d1d"],  # Emergency - dark red
+                    [0.79, "#7f1d1d"],
+                    [0.80, "#6b7280"],  # No data
                     [1.00, "#6b7280"],
                 ],
                 zmin=0,
