@@ -511,10 +511,10 @@ def status_color(status):
 
     if status == "긴급점검":
         return {
-            "bg": "#3b0764",
-            "border": "#c084fc",
-            "text": "#f3e8ff",
-            "badge": "#a855f7"
+            "bg": "#3f0a0a",
+            "border": "#991b1b",
+            "text": "#fee2e2",
+            "badge": "#7f1d1d"
         }
 
     if status == "위험":
