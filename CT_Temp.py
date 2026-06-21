@@ -1389,8 +1389,6 @@ if uploaded_file is not None:
         with col_e:
             st.metric("이상값 대체 건수", f"{abnormal_count:,}건")
 
-        with col_f:
-            st.metric("분석 제외 건수", f"{excluded_count:,}건")
 
         if abnormal_count > 0:
             with st.expander("⚠️ 이상값 목록 확인 (-50℃ 미만 또는 60℃ 초과)"):
