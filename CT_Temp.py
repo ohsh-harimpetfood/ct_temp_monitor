@@ -7,7 +7,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import plotly.graph_objects as go
 
-from cold_chain_report_payload import SCHEMA_VERSION, SOURCE, build_report_meta
+from cold_chain_report_payload import (
+    SCHEMA_VERSION,
+    SOURCE,
+    build_report_meta,
+    build_summary,
+)
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
@@ -1363,11 +1368,18 @@ if uploaded_file is not None:
             uploaded_filename=uploaded_file.name,
             dashboard_period_days=len(period_dates),
         )
-
-        with st.expander("🧪 자동메일 payload meta 확인"):
+        
+        summary_payload = build_summary(container_status_df)
+        
+        with st.expander("🧪 자동메일 payload 확인"):
             st.write("schema_version:", SCHEMA_VERSION)
             st.write("source:", SOURCE)
+        
+            st.markdown("##### report_meta")
             st.json(report_meta)
+        
+            st.markdown("##### summary")
+            st.json(summary_payload)
         
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
