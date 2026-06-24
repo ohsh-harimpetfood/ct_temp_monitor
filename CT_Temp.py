@@ -1467,6 +1467,42 @@ if uploaded_file is not None:
                 st.error("❌ Apps Script 보고서 payload 수신 실패")
         
             st.json(post_result)
+
+        st.markdown("#### 👀 메일 초안 미리보기")
+
+        if st.button("메일 초안 미리보기 생성", use_container_width=True):
+            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
+            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
+        
+            preview_result = webhook_client.post_report_preview(
+                webhook_url=webhook_url,
+                webhook_token=webhook_token,
+                payload=report_payload_json,
+            )
+        
+            if preview_result.get("ok"):
+                st.success("✅ 메일 미리보기 생성 성공")
+        
+                preview = preview_result.get("response", {}).get("preview", {})
+                html_body = preview.get("html_body", "")
+        
+                st.caption(f"받는 사람: {preview.get('to', '')}")
+                st.caption(f"제목: {preview.get('subject', '')}")
+        
+                with st.expander("📧 메일 미리보기 열기", expanded=True):
+                    components.html(
+                        html_body,
+                        height=900,
+                        scrolling=True,
+                    )
+        
+                with st.expander("🧪 미리보기 응답 JSON 확인", expanded=False):
+                    st.json(preview_result)
+        
+            else:
+                st.error("❌ 메일 미리보기 생성 실패")
+                st.json(preview_result)
+
         
         render_v4_summary_dashboard(
             daily_status_df=daily_status_df,
