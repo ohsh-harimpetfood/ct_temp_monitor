@@ -1378,6 +1378,13 @@ if uploaded_file is not None:
         )
 
         metrics_payload = report_payload.build_metrics(container_status_df)
+
+        data_quality_payload = report_payload.build_data_quality(
+            df_raw=df_raw,
+            df_long=df_long,
+            abnormal_count=abnormal_count,
+            excluded_count=excluded_count,
+        )
         
         with st.expander("🧪 자동메일 payload 확인"):
             st.write("schema_version:", report_payload.SCHEMA_VERSION)
@@ -1400,6 +1407,9 @@ if uploaded_file is not None:
             st.markdown("##### metrics")
             st.caption(f"metrics total: {len(metrics_payload)}")
             st.json(metrics_payload[:3])
+
+            st.markdown("##### data_quality")
+            st.json(data_quality_payload)
         
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
