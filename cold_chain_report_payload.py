@@ -356,3 +356,53 @@ def build_default_request(status, issue):
         return "해당 CT의 온도 추이와 현장 상태를 확인 바랍니다."
 
     return "필요 시 현장 상태를 확인 바랍니다."
+
+
+def build_metrics(container_status_df):
+    """
+    CT별 종합 상태표(container_status_df)를 기준으로
+    LLM 분석 및 메일 상세 참고용 metrics payload를 생성한다.
+
+    container_status_df 필요 컬럼:
+    - 컨테이너
+    - 종합상태
+    - 대표이슈
+    - 오늘이탈수
+    - 최근3일이슈일
+    - 최악최저온도
+    - 최저냉동효율
+    - 최고냉동효율
+    - 최저유지율
+    - 최근측정일
+    """
+
+    if container_status_df is None or container_status_df.empty:
+        return []
+
+    df = container_status_df.copy()
+    df["ct_no"] = df["컨테이너"].apply(extract_ct_no)
+    df = df.sort_values("ct_no")
+
+    rows = []
+
+    for _, row in df.iterrows():
+        source_ct_label = str(row.get("컨테이너", ""))
+        ct_no = extract_ct_no(source_ct_label)
+        ct_label = f"CT{ct_no:02d}"
+
+        rows.append({
+            "team": get_team_by_ct(source_ct_label),
+            "ct_no": ct_no,
+            "ct_label": ct_label,
+            "final_status": str(row.get("종합상태", "데이터없음")),
+            "main_issue": str(row.get("대표이슈", "")),
+            "worst_min_temp": safe_float_or_none(row.get("최악최저온도")),
+            "cooling_efficiency_min": safe_float_or_none(row.get("최저냉동효율")),
+            "cooling_efficiency_max": safe_float_or_none(row.get("최고냉동효율")),
+            "under_minus15_rate_min": safe_float_or_none(row.get("최저유지율")),
+            "today_deviation_count": safe_int_or_none(row.get("오늘이탈수")),
+            "issue_days_3d": safe_int_or_none(row.get("최근3일이슈일")),
+            "latest_measured_date": format_date_string(row.get("최근측정일")),
+        })
+
+    return rows
