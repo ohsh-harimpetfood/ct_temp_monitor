@@ -1371,6 +1371,11 @@ if uploaded_file is not None:
             container_status_df=container_status_df,
             period_dates=period_dates,
         )
+
+        check_list_payload = report_payload.build_check_list(
+            check_list_df=check_list_df,
+            container_status_df=container_status_df,
+        )
         
         with st.expander("🧪 자동메일 payload 확인"):
             st.write("schema_version:", report_payload.SCHEMA_VERSION)
@@ -1385,6 +1390,10 @@ if uploaded_file is not None:
             st.markdown("##### heatmap_rows")
             st.caption(f"heatmap_rows total: {len(heatmap_rows_payload)}")
             st.json(heatmap_rows_payload[:3])
+
+            st.markdown("##### check_list")
+            st.caption(f"check_list total: {len(check_list_payload)}")
+            st.json(check_list_payload)
         
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
