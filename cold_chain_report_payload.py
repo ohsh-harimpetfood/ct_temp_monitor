@@ -212,3 +212,147 @@ def build_heatmap_rows(daily_status_df, container_status_df, period_dates):
         })
 
     return heatmap_rows
+
+def build_check_list(check_list_df, container_status_df=None):
+    """
+    우선점검 리스트(check_list_df)를 Apps Script 메일 payload용으로 변환한다.
+
+    check_list_df 필요 컬럼:
+    - 상태
+    - 컨테이너
+    - 측정일자
+    - 이슈
+    - 최저온도
+    - 냉동효율(%)
+    - -15℃이하유지율(%)
+
+    container_status_df 선택 컬럼:
+    - 컨테이너
+    - 오늘이탈수
+    - 최근3일이슈일
+    """
+
+    if check_list_df is None or check_list_df.empty:
+        return []
+
+    status_priority = {
+        "긴급점검": 1,
+        "위험": 2,
+        "데이터 연결 이상": 3,
+        "과냉주의": 4,
+        "주의": 5,
+        "데이터없음": 6,
+        "정상": 99,
+    }
+
+    status_lookup = {}
+
+    if container_status_df is not None and not container_status_df.empty:
+        for _, row in container_status_df.iterrows():
+            source_ct_label = str(row.get("컨테이너", ""))
+            status_lookup[source_ct_label] = {
+                "today_deviation_count": safe_int_or_none(row.get("오늘이탈수")),
+                "issue_days_3d": safe_int_or_none(row.get("최근3일이슈일")),
+            }
+
+    rows = []
+
+    for _, row in check_list_df.iterrows():
+        source_ct_label = str(row.get("컨테이너", ""))
+        ct_no = extract_ct_no(source_ct_label)
+        ct_label = f"CT{ct_no:02d}"
+
+        status = str(row.get("상태", "데이터없음"))
+        issue = str(row.get("이슈", ""))
+
+        extra = status_lookup.get(source_ct_label, {})
+
+        item = {
+            "priority": status_priority.get(status, 99),
+            "team": get_team_by_ct(source_ct_label),
+            "ct_no": ct_no,
+            "ct_label": ct_label,
+            "status": status,
+            "date": format_date_string(row.get("측정일자")),
+            "issue": issue,
+            "metrics": {
+                "min_temp": safe_float_or_none(row.get("최저온도")),
+                "cooling_efficiency": safe_float_or_none(row.get("냉동효율(%)")),
+                "under_minus15_rate": safe_float_or_none(row.get("-15℃이하유지율(%)")),
+                "today_deviation_count": extra.get("today_deviation_count"),
+                "issue_days_3d": extra.get("issue_days_3d"),
+            },
+            "request": build_default_request(status, issue),
+        }
+
+        rows.append(item)
+
+    rows = sorted(
+        rows,
+        key=lambda x: (x["priority"], x["ct_no"])
+    )
+
+    return rows
+
+
+def safe_float_or_none(value):
+    """
+    NaN, None 값을 JSON 전송 가능한 None으로 변환한다.
+    """
+    if pd.isna(value):
+        return None
+
+    try:
+        return round(float(value), 1)
+    except Exception:
+        return None
+
+
+def safe_int_or_none(value):
+    """
+    NaN, None 값을 JSON 전송 가능한 None으로 변환한다.
+    """
+    if pd.isna(value):
+        return None
+
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def format_date_string(value):
+    """
+    날짜 값을 YYYY-MM-DD 문자열로 변환한다.
+    """
+    if pd.isna(value):
+        return ""
+
+    try:
+        return pd.to_datetime(value).strftime("%Y-%m-%d")
+    except Exception:
+        return str(value)
+
+
+def build_default_request(status, issue):
+    """
+    상태값 기준 기본 요청사항 문구를 생성한다.
+    이후 운영하면서 문구는 조정 가능.
+    """
+
+    if status == "긴급점검":
+        return "장비 운전상태, 문 닫힘 상태, 센서 위치, 냉동기 작동 여부를 우선 확인 바랍니다."
+
+    if status == "위험":
+        return "최근 이탈 이력과 현장 운전상태를 확인하고 필요 시 장비 점검을 진행 바랍니다."
+
+    if status == "데이터 연결 이상":
+        return "최근 데이터 수집 여부, 데이터로거 전원, 통신 상태를 우선 확인 바랍니다."
+
+    if status == "과냉주의":
+        return "설정온도, 운전조건, 과냉 운전 여부를 확인 바랍니다."
+
+    if status == "주의":
+        return "해당 CT의 온도 추이와 현장 상태를 확인 바랍니다."
+
+    return "필요 시 현장 상태를 확인 바랍니다."
