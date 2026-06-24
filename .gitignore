@@ -1,0 +1,12 @@
+# Local secrets / credentials
+.streamlit/secrets.toml
+.env
+*.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
