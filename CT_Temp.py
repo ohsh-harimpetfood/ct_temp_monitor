@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import plotly.graph_objects as go
 import cold_chain_report_payload as report_payload
+import cold_chain_webhook as webhook_client
 
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
