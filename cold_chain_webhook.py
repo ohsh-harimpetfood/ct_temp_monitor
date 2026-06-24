@@ -111,3 +111,59 @@ def post_report_payload(webhook_url, webhook_token, payload, timeout=30):
             "ok": False,
             "error": str(e),
         }
+
+def post_report_preview(webhook_url, webhook_token, payload, timeout=30):
+    """
+    Apps Script Webhook으로 보고서 payload를 보내고
+    Gmail 초안 생성 없이 HTML 미리보기만 받아온다.
+    """
+
+    if not webhook_url:
+        return {
+            "ok": False,
+            "error": "APPS_SCRIPT_WEBHOOK_URL이 비어 있습니다.",
+        }
+
+    if not webhook_token:
+        return {
+            "ok": False,
+            "error": "REPORT_WEBHOOK_TOKEN이 비어 있습니다.",
+        }
+
+    if not payload:
+        return {
+            "ok": False,
+            "error": "전송할 payload가 없습니다.",
+        }
+
+    send_payload = dict(payload)
+    send_payload["token"] = webhook_token
+    send_payload["mode"] = "preview"
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json=send_payload,
+            timeout=timeout,
+        )
+
+        try:
+            response_json = response.json()
+        except Exception:
+            response_json = {
+                "raw_text": response.text[:1000]
+            }
+
+        return {
+            "ok": response.ok and response_json.get("ok") is True,
+            "status_code": response.status_code,
+            "response": response_json,
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+        }
+
+
