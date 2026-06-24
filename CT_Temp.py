@@ -1426,28 +1426,29 @@ if uploaded_file is not None:
             st.markdown("##### final payload preview")
             st.caption("실제 token은 화면에 노출하지 않고, 전송 직전에 Streamlit Secrets에서 주입할 예정입니다.")
             st.json(report_payload_json)
-
-            st.markdown("#### 📡 Apps Script Webhook 연결 테스트")
-
-            if st.button("Webhook ping 테스트", use_container_width=True):
-                webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
-                webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
-            
-                ping_result = webhook_client.post_webhook_ping(
-                    webhook_url=webhook_url,
-                    webhook_token=webhook_token,
-                )
-            
-                if ping_result.get("ok"):
-                    st.success("✅ Apps Script Webhook ping 성공")
-                else:
-                    st.error("❌ Apps Script Webhook ping 실패")
-            
-                # token은 표시하지 않음
-                st.json(ping_result)
-        
+      
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
+        st.markdown("#### 📡 Apps Script Webhook 연결 테스트")
+
+        if st.button("Webhook ping 테스트", use_container_width=True):
+            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
+            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
+        
+            ping_result = webhook_client.post_webhook_ping(
+                webhook_url=webhook_url,
+                webhook_token=webhook_token,
+            )
+        
+            if ping_result.get("ok"):
+                st.success("✅ Apps Script Webhook ping 성공")
+            else:
+                st.error("❌ Apps Script Webhook ping 실패")
+        
+            # token은 표시하지 않음
+            st.json(ping_result)
+        
+        
         render_v4_summary_dashboard(
             daily_status_df=daily_status_df,
             recent_df=recent_df,
