@@ -1385,6 +1385,17 @@ if uploaded_file is not None:
             abnormal_count=abnormal_count,
             excluded_count=excluded_count,
         )
+
+        report_payload_json = report_payload.build_report_payload(
+            mode="draft",
+            report_meta=report_meta,
+            summary=summary_payload,
+            heatmap_rows=heatmap_rows_payload,
+            check_list=check_list_payload,
+            metrics=metrics_payload,
+            data_quality=data_quality_payload,
+        )
+
         
         with st.expander("🧪 자동메일 payload 확인"):
             st.write("schema_version:", report_payload.SCHEMA_VERSION)
@@ -1410,6 +1421,11 @@ if uploaded_file is not None:
 
             st.markdown("##### data_quality")
             st.json(data_quality_payload)
+
+            st.markdown("##### final payload preview")
+            st.caption("실제 token은 화면에 노출하지 않고, 전송 직전에 Streamlit Secrets에서 주입할 예정입니다.")
+            st.json(report_payload_json)
+
         
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
