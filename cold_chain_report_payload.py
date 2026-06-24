@@ -48,3 +48,56 @@ def build_report_meta(
         "uploaded_filename": uploaded_filename or "",
         "dashboard_period_days": int(dashboard_period_days),
     }
+
+
+def build_summary(container_status_df):
+    """
+    컨테이너별 최종 상태표(container_status_df)를 기준으로
+    메일 상단 요약 카드용 summary payload를 생성한다.
+    """
+
+    summary = {
+        "total_ct": 0,
+        "normal": 0,
+        "caution": 0,
+        "overcool": 0,
+        "risk": 0,
+        "emergency": 0,
+        "connection_issue": 0,
+        "no_data": 0,
+        "issue_total": 0,
+    }
+
+    if container_status_df is None or container_status_df.empty:
+        return summary
+
+    status_key_map = {
+        "정상": "normal",
+        "주의": "caution",
+        "과냉주의": "overcool",
+        "위험": "risk",
+        "긴급점검": "emergency",
+        "데이터 연결 이상": "connection_issue",
+        "데이터없음": "no_data",
+    }
+
+    summary["total_ct"] = int(len(container_status_df))
+
+    for status in container_status_df["종합상태"].astype(str).tolist():
+        key = status_key_map.get(status)
+
+        if key:
+            summary[key] += 1
+        else:
+            summary["no_data"] += 1
+
+    summary["issue_total"] = (
+        summary["caution"]
+        + summary["overcool"]
+        + summary["risk"]
+        + summary["emergency"]
+        + summary["connection_issue"]
+        + summary["no_data"]
+    )
+
+    return summary
