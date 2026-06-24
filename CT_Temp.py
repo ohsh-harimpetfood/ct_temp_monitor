@@ -6,13 +6,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import plotly.graph_objects as go
+import cold_chain_report_payload as report_payload
 
-from cold_chain_report_payload import (
-    SCHEMA_VERSION,
-    SOURCE,
-    build_report_meta,
-    build_summary,
-)
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
@@ -1360,7 +1355,7 @@ if uploaded_file is not None:
             freq="D"
         ).date.tolist()
         
-        report_meta = build_report_meta(
+        report_meta = report_payload.build_report_meta(
             report_date=dashboard_today,
             period_start=dashboard_start,
             period_end=dashboard_today,
@@ -1369,11 +1364,11 @@ if uploaded_file is not None:
             dashboard_period_days=len(period_dates),
         )
         
-        summary_payload = build_summary(container_status_df)
+        summary_payload = report_payload.build_summary(container_status_df)
         
         with st.expander("🧪 자동메일 payload 확인"):
-            st.write("schema_version:", SCHEMA_VERSION)
-            st.write("source:", SOURCE)
+            st.write("schema_version:", report_payload.SCHEMA_VERSION)
+            st.write("source:", report_payload.SOURCE)
         
             st.markdown("##### report_meta")
             st.json(report_meta)
