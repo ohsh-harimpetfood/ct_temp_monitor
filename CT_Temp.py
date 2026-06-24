@@ -1447,7 +1447,25 @@ if uploaded_file is not None:
         
             # token은 표시하지 않음
             st.json(ping_result)
+
+        st.markdown("#### 📤 Apps Script 보고서 payload 수신 테스트")
+
+        if st.button("보고서 payload 전송 테스트", use_container_width=True):
+            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
+            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
         
+            post_result = webhook_client.post_report_payload(
+                webhook_url=webhook_url,
+                webhook_token=webhook_token,
+                payload=report_payload_json,
+            )
+        
+            if post_result.get("ok"):
+                st.success("✅ Apps Script 보고서 payload 수신 성공")
+            else:
+                st.error("❌ Apps Script 보고서 payload 수신 실패")
+        
+            st.json(post_result)
         
         render_v4_summary_dashboard(
             daily_status_df=daily_status_df,
