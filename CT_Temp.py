@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import plotly.graph_objects as go
 
+from cold_chain_report_payload import SCHEMA_VERSION, SOURCE, build_report_meta
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
