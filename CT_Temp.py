@@ -1365,9 +1365,9 @@ if uploaded_file is not None:
         )
 
         with st.expander("🧪 자동메일 payload meta 확인"):
-        st.write("schema_version:", SCHEMA_VERSION)
-        st.write("source:", SOURCE)
-        st.json(report_meta)
+            st.write("schema_version:", SCHEMA_VERSION)
+            st.write("source:", SOURCE)
+            st.json(report_meta)
         
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
