@@ -181,14 +181,15 @@ def build_heatmap_rows(daily_status_df, container_status_df, period_dates):
     heatmap_rows = []
 
     for _, row in status_df.iterrows():
-        ct_label = str(row["컨테이너"])
-        ct_no = extract_ct_no(ct_label)
+        source_ct_label = str(row["컨테이너"])
+        ct_no = extract_ct_no(source_ct_label)
+        ct_label = f"CT{ct_no:02d}"
 
         statuses = []
 
         for date_str in period_date_strings:
             status_item = daily_lookup.get(
-                (ct_label, date_str),
+                (source_ct_label, date_str),
                 {
                     "status": "데이터없음",
                     "issue": "데이터 없음",
