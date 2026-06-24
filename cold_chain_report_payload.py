@@ -406,3 +406,44 @@ def build_metrics(container_status_df):
         })
 
     return rows
+
+
+def build_data_quality(df_raw, df_long, abnormal_count, excluded_count):
+    """
+    자동메일 하단 데이터 품질 참고용 payload를 생성한다.
+
+    df_raw:
+        원본 CSV 데이터프레임
+
+    df_long:
+        이상값/결측값 제외 후 분석 대상 long-form 데이터프레임
+
+    abnormal_count:
+        -50℃ 미만 또는 60℃ 초과로 이상값 처리된 건수
+
+    excluded_count:
+        결측/이상값 처리 후 분석에서 제외된 전체 건수
+    """
+
+    raw_count = 0
+
+    if df_raw is not None and not df_raw.empty:
+        # 첫 번째 컬럼은 측정일시이므로 제외하고 온도 측정 셀 수만 계산
+        raw_count = int(df_raw.shape[0] * max(df_raw.shape[1] - 1, 0))
+
+    valid_count = int(len(df_long)) if df_long is not None else 0
+    invalid_count = int(excluded_count or 0)
+    abnormal_replaced_count = int(abnormal_count or 0)
+
+    # raw_count가 계산되지 않는 예외 상황 대비
+    if raw_count == 0:
+        raw_count = valid_count + invalid_count
+
+    return {
+        "raw_count": raw_count,
+        "valid_count": valid_count,
+        "invalid_count": invalid_count,
+        "abnormal_replaced_count": abnormal_replaced_count,
+        "missing_or_invalid_count": invalid_count,
+        "note": "이상값 및 결측값은 분석 대상에서 제외함",
+    }
