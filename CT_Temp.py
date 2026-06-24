@@ -1349,6 +1349,26 @@ if uploaded_file is not None:
             build_status_tables(df_summary, today)
         )
 
+        period_dates = pd.date_range(
+            start=dashboard_start,
+            end=dashboard_today,
+            freq="D"
+        ).date.tolist()
+        
+        report_meta = build_report_meta(
+            report_date=dashboard_today,
+            period_start=dashboard_start,
+            period_end=dashboard_today,
+            period_dates=period_dates,
+            uploaded_filename=uploaded_file.name,
+            dashboard_period_days=len(period_dates),
+        )
+
+        with st.expander("🧪 자동메일 payload meta 확인"):
+        st.write("schema_version:", SCHEMA_VERSION)
+        st.write("source:", SOURCE)
+        st.json(report_meta)
+        
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
         render_v4_summary_dashboard(
