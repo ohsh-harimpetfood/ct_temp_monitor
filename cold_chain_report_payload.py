@@ -447,3 +447,43 @@ def build_data_quality(df_raw, df_long, abnormal_count, excluded_count):
         "missing_or_invalid_count": invalid_count,
         "note": "이상값 및 결측값은 분석 대상에서 제외함",
     }
+
+def build_report_payload(
+    mode,
+    report_meta,
+    summary,
+    heatmap_rows,
+    check_list,
+    metrics,
+    data_quality,
+    token=None,
+):
+    """
+    Streamlit → Apps Script로 보낼 최종 payload를 생성한다.
+
+    주의:
+    - Gemini API Key는 절대 payload에 넣지 않는다.
+    - Gmail 권한 정보도 절대 payload에 넣지 않는다.
+    - token은 Webhook 호출 직전에 Streamlit Secrets에서 주입한다.
+    """
+
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "source": SOURCE,
+        "mode": mode,
+        "report_meta": report_meta,
+        "summary": summary,
+        "heatmap_rows": heatmap_rows,
+        "check_list": check_list,
+        "metrics": metrics,
+        "data_quality": data_quality,
+    }
+
+    # 실제 전송 시에만 token을 넣는다.
+    # 화면 확인용 preview에서는 token을 노출하지 않기 위함.
+    if token:
+        payload["token"] = token
+    else:
+        payload["token"] = "__TOKEN_INJECTED_AT_SEND_TIME__"
+
+    return payload
