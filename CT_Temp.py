@@ -85,9 +85,18 @@ if "payload_test_result" not in st.session_state:
 if "payload_test_ok" not in st.session_state:
     st.session_state["payload_test_ok"] = False
 
+if "main_preview_result" not in st.session_state:
+    st.session_state["main_preview_result"] = None
+
+if "main_preview_ok" not in st.session_state:
+    st.session_state["main_preview_ok"] = False
+
+if "send_confirmed" not in st.session_state:
+    st.session_state["send_confirmed"] = False
+
 
 if menu == "분석 프로그램":
-    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4")
+    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.2")
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
 
 else:
@@ -137,6 +146,41 @@ else:
                 if st.checkbox("연결 테스트 응답 JSON 보기", key="show_ping_json_before_analysis"):
                     st.json(ping_result)
 
+        st.markdown("---")
+
+        st.markdown("#### 관리자용 Gmail 초안 생성")
+        st.caption("실제 운영 발송 전, Gmail 초안 생성 동작을 별도로 점검할 때만 사용합니다.")
+        
+        if st.button("Gmail 초안 생성 테스트", key="admin_draft_button", use_container_width=True):
+            with st.spinner("Gmail 초안 생성 중입니다..."):
+                draft_result = webhook_client.post_report_payload(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=60,
+                )
+        
+            st.session_state["draft_result"] = draft_result
+            st.session_state["draft_ok"] = bool(draft_result.get("ok"))
+        
+        draft_result = st.session_state.get("draft_result")
+        
+        if draft_result is not None:
+            if st.session_state.get("draft_ok"):
+                st.success("✅ Gmail 초안 생성 완료")
+        
+                response = draft_result.get("response", {})
+                draft = response.get("draft", {})
+        
+                if draft:
+                    st.caption(f"수신자: {draft.get('to', '-')}")
+                    st.caption(f"제목: {draft.get('subject', '-')}")
+            else:
+                st.error("❌ Gmail 초안 생성 실패")
+        
+            if st.checkbox("Gmail 초안 생성 응답 JSON 보기", key="show_admin_draft_json"):
+                st.json(draft_result)
+        
         st.stop()
 
     report_meta = st.session_state.get("report_meta") or {}
@@ -180,129 +224,107 @@ else:
 
     st.divider()
 
-    st.markdown("### 자동보고서 생성")
+    st.markdown("### 자동보고서 생성 / 미리보기")
     st.info(
-        "현재 분석 결과를 기준으로 Gmail 초안함에 자동보고서를 생성합니다. "
-        "실제 메일 발송은 하지 않습니다."
+        "현재 분석 결과를 기준으로 발송 전 자동보고서를 생성합니다. "
+        "보고서 내용을 확인한 뒤 전체 메일 발송 단계로 진행합니다."
     )
-
+    
     if st.button(
-        "📧 자동보고서 생성 (Gmail 초안)",
-        key="main_draft_button",
+        "🧾 자동보고서 생성 / 미리보기",
+        key="main_preview_button",
         type="primary",
         use_container_width=True,
     ):
-        with st.spinner("Gmail 초안 생성 중입니다..."):
-            draft_result = webhook_client.post_report_payload(
+        with st.spinner("자동보고서를 생성 중입니다..."):
+            main_preview_result = webhook_client.post_report_preview(
                 webhook_url=webhook_url,
                 webhook_token=webhook_token,
                 payload=report_payload_json,
                 timeout=60,
             )
-
-        st.session_state["draft_result"] = draft_result
-        st.session_state["draft_ok"] = bool(draft_result.get("ok"))
-
-    draft_result = st.session_state.get("draft_result")
-
-    if draft_result is not None:
-        if st.session_state.get("draft_ok"):
-            st.success("✅ Gmail 초안 생성 완료")
-
-            response = draft_result.get("response", {})
-            draft = response.get("draft", {})
-
-            if draft:
-                st.caption(f"수신자: {draft.get('to', '-')}")
-                st.caption(f"제목: {draft.get('subject', '-')}")
-        else:
-            st.error("❌ Gmail 초안 생성 실패")
-
-        if st.checkbox("초안 생성 응답 JSON 보기", key="show_draft_json"):
-            st.json(draft_result)
-
-    st.divider()
-
-    with st.expander("🔧 관리자 / 테스트 기능", expanded=False):
-        st.caption("일반 운영자는 열지 않아도 됩니다. 연결 점검, 미리보기, 전송 데이터 검증용입니다.")
-
-        st.markdown("#### 1) 시스템 연결 테스트")
-
-        col_a, col_b = st.columns(2)
-
-        with col_a:
-            if webhook_url:
-                st.success("Webhook URL 설정됨")
-            else:
-                st.error("Webhook URL 미설정")
-
-        with col_b:
-            if webhook_token:
-                st.success("Webhook Token 설정됨")
-            else:
-                st.error("Webhook Token 미설정")
-
-        if st.button("시스템 연결 테스트", key="admin_webhook_ping_button", use_container_width=True):
-            ping_result = webhook_client.post_webhook_ping(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-            )
-
-            st.session_state["webhook_ping_result"] = ping_result
-            st.session_state["webhook_ping_ok"] = bool(ping_result.get("ok"))
-
-        ping_result = st.session_state.get("webhook_ping_result")
-
-        if ping_result is not None:
-            if st.session_state.get("webhook_ping_ok"):
-                st.success("✅ Apps Script Webhook 연결 성공")
-            else:
-                st.error("❌ Apps Script Webhook 연결 실패")
-
-            if st.checkbox("연결 테스트 응답 JSON 보기", key="show_ping_json"):
-                st.json(ping_result)
-
-        st.markdown("---")
-
-        st.markdown("#### 2) 보고서 미리보기")
-
-        if st.button("보고서 미리보기 생성", key="admin_preview_button", use_container_width=True):
-            with st.spinner("Apps Script에서 메일 HTML을 생성 중입니다..."):
-                preview_result = webhook_client.post_report_preview(
-                    webhook_url=webhook_url,
-                    webhook_token=webhook_token,
-                    payload=report_payload_json,
-                    timeout=60,
+    
+        st.session_state["main_preview_result"] = main_preview_result
+        st.session_state["main_preview_ok"] = bool(main_preview_result.get("ok"))
+        st.session_state["send_confirmed"] = False
+    
+    main_preview_result = st.session_state.get("main_preview_result")
+    
+    if main_preview_result is not None:
+        if st.session_state.get("main_preview_ok"):
+            st.success("✅ 자동보고서 생성 완료. 아래 내용을 확인하세요.")
+    
+            preview = main_preview_result.get("response", {}).get("preview", {})
+            received = main_preview_result.get("response", {}).get("received", {})
+            html_body = preview.get("html_body", "")
+    
+            col_m1, col_m2 = st.columns([1, 2])
+    
+            with col_m1:
+                st.caption("수신자")
+                st.write(preview.get("to", "-"))
+    
+            with col_m2:
+                st.caption("제목")
+                st.write(preview.get("subject", "-"))
+    
+            with st.expander("수신 데이터 요약", expanded=False):
+                col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+    
+                with col_r1:
+                    st.metric("schema", received.get("schema_version", "-"))
+    
+                with col_r2:
+                    st.metric("heatmap_rows", received.get("heatmap_rows_count", 0))
+    
+                with col_r3:
+                    st.metric("check_list", received.get("check_list_count", 0))
+    
+                with col_r4:
+                    st.metric("metrics", received.get("metrics_count", 0))
+    
+            if html_body:
+                st.markdown("#### 보고서 미리보기")
+    
+                components.html(
+                    html_body,
+                    height=980,
+                    scrolling=True,
                 )
-
-            st.session_state["preview_result"] = preview_result
-            st.session_state["preview_ok"] = bool(preview_result.get("ok"))
-
-        preview_result = st.session_state.get("preview_result")
-
-        if preview_result is not None:
-            if st.session_state.get("preview_ok"):
-                st.success("✅ 보고서 미리보기 생성 성공")
-
-                preview = preview_result.get("response", {}).get("preview", {})
-                html_body = preview.get("html_body", "")
-
-                st.caption(f"수신자: {preview.get('to', '-')}")
-                st.caption(f"제목: {preview.get('subject', '-')}")
-
-                if html_body:
-                    components.html(
-                        html_body,
-                        height=900,
-                        scrolling=True,
-                    )
-                else:
-                    st.warning("미리보기 HTML이 비어 있습니다.")
             else:
-                st.error("❌ 보고서 미리보기 생성 실패")
+                st.warning("미리보기 HTML이 비어 있습니다.")
+    
+            st.markdown("#### 최종 발송 확인")
+    
+            send_confirmed = st.checkbox(
+                "보고서 내용과 수신자를 확인했습니다.",
+                key="send_confirmed",
+            )
+    
+            if send_confirmed:
+                st.warning(
+                    "아직 실제 전체 메일 발송 기능은 연결 전입니다. "
+                    "다음 단계에서 Apps Script send mode와 Streamlit 발송 버튼을 연결합니다."
+                )
+    
+            st.button(
+                "📨 전체 메일 발송",
+                key="main_send_button_disabled",
+                type="primary",
+                use_container_width=True,
+                disabled=True,
+            )
+    
+            st.caption("현재 단계에서는 발송 버튼을 비활성화했습니다. 다음 단계에서 실제 발송 기능을 연결합니다.")
+    
+            if st.checkbox("자동보고서 생성 응답 JSON 보기", key="show_main_preview_json"):
+                st.json(main_preview_result)
 
-            if st.checkbox("미리보기 응답 JSON 보기", key="show_preview_json"):
-                st.json(preview_result)
+    else:
+        st.error("❌ 자동보고서 생성 실패")
+
+        if st.checkbox("실패 응답 JSON 보기", key="show_main_preview_error_json"):
+            st.json(main_preview_result)
 
         st.markdown("---")
 
