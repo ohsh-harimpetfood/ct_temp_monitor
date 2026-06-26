@@ -33,6 +33,7 @@ with st.sidebar:
         index=0
     )
 
+
 # =========================================================
 # Session State 초기화
 # =========================================================
@@ -67,13 +68,11 @@ if "webhook_ping_ok" not in st.session_state:
     st.session_state["webhook_ping_ok"] = False
 
 
-
 if menu == "분석 프로그램":
-    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.1")
+    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4")
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
 
 else:
-    else:
     st.title("📧 냉동 CT 자동보고서 관리")
     st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 기능을 실행합니다.")
 
@@ -171,8 +170,7 @@ else:
         st.json(st.session_state.get("report_payload_json"))
 
     st.stop()
-
-
+    
 # =========================================================
 # 공통 유틸 함수
 # =========================================================
