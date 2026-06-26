@@ -18,12 +18,42 @@ from openpyxl.utils import get_column_letter
 # Streamlit 기본 설정
 # =========================================================
 st.set_page_config(
-    page_title="❄ 냉동 컨테이너 온도관리 플랫폼.V4",
+    page_title="❄ 냉동 CT 온도관리 시스템",
     layout="wide"
 )
 
-st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4")
-st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
+with st.sidebar:
+    st.markdown("### ❄ 냉동 CT 관리")
+    menu = st.radio(
+        "메뉴",
+        [
+            "분석 프로그램",
+            "자동보고서 관리",
+        ],
+        index=0
+    )
+
+if menu == "분석 프로그램":
+    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.1")
+    st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
+
+else:
+    st.title("📧 냉동 CT 자동보고서 관리")
+    st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 기능을 실행합니다.")
+
+    st.info(
+        "현재는 자동보고서 관리 화면 분리 1단계입니다. "
+        "다음 단계에서 분석 결과 payload를 이 화면에서 재사용하도록 연결합니다."
+    )
+
+    st.markdown("#### 예정 기능")
+    st.write("- Apps Script Webhook 연결 테스트")
+    st.write("- 보고서 payload 수신 테스트")
+    st.write("- 메일 초안 HTML 미리보기")
+    st.write("- Gmail 초안 생성")
+    st.write("- 실제 자동 발송 전환")
+
+    st.stop()
 
 
 # =========================================================
