@@ -60,6 +60,14 @@ if "metrics_payload" not in st.session_state:
 if "data_quality_payload" not in st.session_state:
     st.session_state["data_quality_payload"] = None
 
+if "webhook_ping_result" not in st.session_state:
+    st.session_state["webhook_ping_result"] = None
+
+if "webhook_ping_ok" not in st.session_state:
+    st.session_state["webhook_ping_ok"] = False
+
+
+
 if menu == "분석 프로그램":
     st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.1")
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
