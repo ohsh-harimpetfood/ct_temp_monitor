@@ -67,6 +67,24 @@ if "webhook_ping_result" not in st.session_state:
 if "webhook_ping_ok" not in st.session_state:
     st.session_state["webhook_ping_ok"] = False
 
+if "draft_result" not in st.session_state:
+    st.session_state["draft_result"] = None
+
+if "draft_ok" not in st.session_state:
+    st.session_state["draft_ok"] = False
+
+if "preview_result" not in st.session_state:
+    st.session_state["preview_result"] = None
+
+if "preview_ok" not in st.session_state:
+    st.session_state["preview_ok"] = False
+
+if "payload_test_result" not in st.session_state:
+    st.session_state["payload_test_result"] = None
+
+if "payload_test_ok" not in st.session_state:
+    st.session_state["payload_test_ok"] = False
+
 
 if menu == "분석 프로그램":
     st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4")
@@ -74,51 +92,51 @@ if menu == "분석 프로그램":
 
 else:
     st.title("📧 냉동 CT 자동보고서 관리")
-    st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 기능을 실행합니다.")
-
-    st.markdown("### 1. Apps Script Webhook 연결 테스트")
+    st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 초안을 생성합니다.")
 
     webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
     webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
 
-    col_a, col_b = st.columns(2)
-
-    with col_a:
-        if webhook_url:
-            st.success("Webhook URL 설정됨")
-        else:
-            st.error("Webhook URL 미설정")
-
-    with col_b:
-        if webhook_token:
-            st.success("Webhook Token 설정됨")
-        else:
-            st.error("Webhook Token 미설정")
-
-    if st.button("Webhook 연결 테스트", key="report_webhook_ping_button", use_container_width=True):
-        ping_result = webhook_client.post_webhook_ping(
-            webhook_url=webhook_url,
-            webhook_token=webhook_token,
-        )
-
-        st.session_state["webhook_ping_result"] = ping_result
-        st.session_state["webhook_ping_ok"] = bool(ping_result.get("ok"))
-
-    ping_result = st.session_state.get("webhook_ping_result")
-
-    if ping_result is not None:
-        if st.session_state.get("webhook_ping_ok"):
-            st.success("✅ Apps Script Webhook 연결 성공")
-        else:
-            st.error("❌ Apps Script Webhook 연결 실패")
-
-        with st.expander("Webhook 응답 확인", expanded=False):
-            st.json(ping_result)
-
-    st.divider()
-
     if not st.session_state.get("analysis_done"):
         st.warning("먼저 좌측 메뉴의 [분석 프로그램]에서 CSV 업로드 및 분석을 완료하세요.")
+
+        with st.expander("🔧 관리자 / 테스트 기능", expanded=False):
+            st.caption("분석 전에도 시스템 연결 상태는 확인할 수 있습니다.")
+
+            col_a, col_b = st.columns(2)
+
+            with col_a:
+                if webhook_url:
+                    st.success("Webhook URL 설정됨")
+                else:
+                    st.error("Webhook URL 미설정")
+
+            with col_b:
+                if webhook_token:
+                    st.success("Webhook Token 설정됨")
+                else:
+                    st.error("Webhook Token 미설정")
+
+            if st.button("시스템 연결 테스트", key="admin_ping_before_analysis", use_container_width=True):
+                ping_result = webhook_client.post_webhook_ping(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                )
+
+                st.session_state["webhook_ping_result"] = ping_result
+                st.session_state["webhook_ping_ok"] = bool(ping_result.get("ok"))
+
+            ping_result = st.session_state.get("webhook_ping_result")
+
+            if ping_result is not None:
+                if st.session_state.get("webhook_ping_ok"):
+                    st.success("✅ Apps Script Webhook 연결 성공")
+                else:
+                    st.error("❌ Apps Script Webhook 연결 실패")
+
+                if st.checkbox("연결 테스트 응답 JSON 보기", key="show_ping_json_before_analysis"):
+                    st.json(ping_result)
+
         st.stop()
 
     report_meta = st.session_state.get("report_meta") or {}
@@ -127,8 +145,11 @@ else:
     heatmap_rows_payload = st.session_state.get("heatmap_rows_payload") or []
     metrics_payload = st.session_state.get("metrics_payload") or []
     data_quality_payload = st.session_state.get("data_quality_payload") or {}
+    report_payload_json = st.session_state.get("report_payload_json")
 
     st.success("✅ 분석 결과 payload가 준비되어 있습니다.")
+
+    st.markdown("### 현재 분석 상태")
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -144,30 +165,201 @@ else:
     with col4:
         st.metric("정상", f"{summary_payload.get('normal', 0)}대")
 
-    st.markdown("#### 현재 보고서 기준")
-
-    st.write(
-        f"- 분석기간: {report_meta.get('period_start', '-')} ~ {report_meta.get('period_end', '-')}"
-    )
-    st.write(
-        f"- 히트맵 rows: {len(heatmap_rows_payload)}건"
-    )
-    st.write(
-        f"- metrics: {len(metrics_payload)}건"
-    )
-    st.write(
-        f"- 데이터 품질: 유효 {data_quality_payload.get('valid_count', 0):,}건 / "
-        f"제외 {data_quality_payload.get('invalid_count', 0):,}건"
+    st.caption(
+        f"분석기간: {report_meta.get('period_start', '-')} ~ {report_meta.get('period_end', '-')} / "
+        f"히트맵 {len(heatmap_rows_payload)}건 / "
+        f"metrics {len(metrics_payload)}건 / "
+        f"유효 데이터 {data_quality_payload.get('valid_count', 0):,}건"
     )
 
     if check_list_payload:
         check_cts = [item.get("ct_label", "") for item in check_list_payload]
-        st.write("- 우선점검 CT: " + ", ".join(check_cts))
+        st.write("우선점검 CT: " + ", ".join(check_cts))
     else:
-        st.write("- 우선점검 CT: 해당 없음")
+        st.write("우선점검 CT: 해당 없음")
 
-    with st.expander("🧪 저장된 report payload 확인", expanded=False):
-        st.json(st.session_state.get("report_payload_json"))
+    st.divider()
+
+    st.markdown("### 자동보고서 생성")
+    st.info(
+        "현재 분석 결과를 기준으로 Gmail 초안함에 자동보고서를 생성합니다. "
+        "실제 메일 발송은 하지 않습니다."
+    )
+
+    if st.button(
+        "📧 자동보고서 생성 (Gmail 초안)",
+        key="main_draft_button",
+        type="primary",
+        use_container_width=True,
+    ):
+        with st.spinner("Gmail 초안 생성 중입니다..."):
+            draft_result = webhook_client.post_report_payload(
+                webhook_url=webhook_url,
+                webhook_token=webhook_token,
+                payload=report_payload_json,
+                timeout=60,
+            )
+
+        st.session_state["draft_result"] = draft_result
+        st.session_state["draft_ok"] = bool(draft_result.get("ok"))
+
+    draft_result = st.session_state.get("draft_result")
+
+    if draft_result is not None:
+        if st.session_state.get("draft_ok"):
+            st.success("✅ Gmail 초안 생성 완료")
+
+            response = draft_result.get("response", {})
+            draft = response.get("draft", {})
+
+            if draft:
+                st.caption(f"수신자: {draft.get('to', '-')}")
+                st.caption(f"제목: {draft.get('subject', '-')}")
+        else:
+            st.error("❌ Gmail 초안 생성 실패")
+
+        if st.checkbox("초안 생성 응답 JSON 보기", key="show_draft_json"):
+            st.json(draft_result)
+
+    st.divider()
+
+    with st.expander("🔧 관리자 / 테스트 기능", expanded=False):
+        st.caption("일반 운영자는 열지 않아도 됩니다. 연결 점검, 미리보기, 전송 데이터 검증용입니다.")
+
+        st.markdown("#### 1) 시스템 연결 테스트")
+
+        col_a, col_b = st.columns(2)
+
+        with col_a:
+            if webhook_url:
+                st.success("Webhook URL 설정됨")
+            else:
+                st.error("Webhook URL 미설정")
+
+        with col_b:
+            if webhook_token:
+                st.success("Webhook Token 설정됨")
+            else:
+                st.error("Webhook Token 미설정")
+
+        if st.button("시스템 연결 테스트", key="admin_webhook_ping_button", use_container_width=True):
+            ping_result = webhook_client.post_webhook_ping(
+                webhook_url=webhook_url,
+                webhook_token=webhook_token,
+            )
+
+            st.session_state["webhook_ping_result"] = ping_result
+            st.session_state["webhook_ping_ok"] = bool(ping_result.get("ok"))
+
+        ping_result = st.session_state.get("webhook_ping_result")
+
+        if ping_result is not None:
+            if st.session_state.get("webhook_ping_ok"):
+                st.success("✅ Apps Script Webhook 연결 성공")
+            else:
+                st.error("❌ Apps Script Webhook 연결 실패")
+
+            if st.checkbox("연결 테스트 응답 JSON 보기", key="show_ping_json"):
+                st.json(ping_result)
+
+        st.markdown("---")
+
+        st.markdown("#### 2) 보고서 미리보기")
+
+        if st.button("보고서 미리보기 생성", key="admin_preview_button", use_container_width=True):
+            with st.spinner("Apps Script에서 메일 HTML을 생성 중입니다..."):
+                preview_result = webhook_client.post_report_preview(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=60,
+                )
+
+            st.session_state["preview_result"] = preview_result
+            st.session_state["preview_ok"] = bool(preview_result.get("ok"))
+
+        preview_result = st.session_state.get("preview_result")
+
+        if preview_result is not None:
+            if st.session_state.get("preview_ok"):
+                st.success("✅ 보고서 미리보기 생성 성공")
+
+                preview = preview_result.get("response", {}).get("preview", {})
+                html_body = preview.get("html_body", "")
+
+                st.caption(f"수신자: {preview.get('to', '-')}")
+                st.caption(f"제목: {preview.get('subject', '-')}")
+
+                if html_body:
+                    components.html(
+                        html_body,
+                        height=900,
+                        scrolling=True,
+                    )
+                else:
+                    st.warning("미리보기 HTML이 비어 있습니다.")
+            else:
+                st.error("❌ 보고서 미리보기 생성 실패")
+
+            if st.checkbox("미리보기 응답 JSON 보기", key="show_preview_json"):
+                st.json(preview_result)
+
+        st.markdown("---")
+
+        st.markdown("#### 3) 데이터 전송 검증")
+        st.caption("현재 payload가 Apps Script에서 정상 수신되는지 확인합니다. Gmail 초안은 생성하지 않습니다.")
+
+        if st.button("데이터 전송 검증", key="admin_payload_test_button", use_container_width=True):
+            with st.spinner("Payload 수신 상태를 확인 중입니다..."):
+                payload_test_result = webhook_client.post_report_preview(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=60,
+                )
+
+            st.session_state["payload_test_result"] = payload_test_result
+            st.session_state["payload_test_ok"] = bool(payload_test_result.get("ok"))
+
+        payload_test_result = st.session_state.get("payload_test_result")
+
+        if payload_test_result is not None:
+            if st.session_state.get("payload_test_ok"):
+                st.success("✅ 데이터 전송 검증 성공")
+
+                response = payload_test_result.get("response", {})
+                received = response.get("received", {})
+
+                col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+
+                with col_p1:
+                    st.metric("schema", received.get("schema_version", "-"))
+
+                with col_p2:
+                    st.metric("heatmap_rows", received.get("heatmap_rows_count", 0))
+
+                with col_p3:
+                    st.metric("check_list", received.get("check_list_count", 0))
+
+                with col_p4:
+                    st.metric("metrics", received.get("metrics_count", 0))
+
+                st.caption(
+                    f"mode: {received.get('mode', '-')} / "
+                    f"report_date: {received.get('report_date', '-')}"
+                )
+            else:
+                st.error("❌ 데이터 전송 검증 실패")
+
+            if st.checkbox("데이터 전송 검증 응답 JSON 보기", key="show_payload_test_json"):
+                st.json(payload_test_result)
+
+        st.markdown("---")
+
+        st.markdown("#### 4) 전송 데이터 상세 보기")
+
+        if st.checkbox("저장된 report payload JSON 보기", key="show_saved_payload_json"):
+            st.json(report_payload_json)
 
     st.stop()
     
