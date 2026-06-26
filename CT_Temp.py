@@ -68,17 +68,57 @@ else:
     st.title("📧 냉동 CT 자동보고서 관리")
     st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 기능을 실행합니다.")
 
-    st.info(
-        "현재는 자동보고서 관리 화면 분리 1단계입니다. "
-        "다음 단계에서 분석 결과 payload를 이 화면에서 재사용하도록 연결합니다."
+    if not st.session_state.get("analysis_done"):
+        st.warning("먼저 좌측 메뉴의 [분석 프로그램]에서 CSV 업로드 및 분석을 완료하세요.")
+        st.stop()
+
+    report_meta = st.session_state.get("report_meta") or {}
+    summary_payload = st.session_state.get("summary_payload") or {}
+    check_list_payload = st.session_state.get("check_list_payload") or []
+    heatmap_rows_payload = st.session_state.get("heatmap_rows_payload") or []
+    metrics_payload = st.session_state.get("metrics_payload") or []
+    data_quality_payload = st.session_state.get("data_quality_payload") or {}
+
+    st.success("✅ 분석 결과 payload가 준비되어 있습니다.")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("기준일", report_meta.get("report_date", "-"))
+
+    with col2:
+        st.metric("분석대상", f"{summary_payload.get('total_ct', 0)}대")
+
+    with col3:
+        st.metric("우선점검", f"{len(check_list_payload)}대")
+
+    with col4:
+        st.metric("정상", f"{summary_payload.get('normal', 0)}대")
+
+    st.markdown("#### 현재 보고서 기준")
+
+    st.write(
+        f"- 분석기간: {report_meta.get('period_start', '-')} ~ {report_meta.get('period_end', '-')}"
+    )
+    st.write(
+        f"- 히트맵 rows: {len(heatmap_rows_payload)}건"
+    )
+    st.write(
+        f"- metrics: {len(metrics_payload)}건"
+    )
+    st.write(
+        f"- 데이터 품질: 유효 {data_quality_payload.get('valid_count', 0):,}건 / "
+        f"제외 {data_quality_payload.get('invalid_count', 0):,}건"
     )
 
-    st.markdown("#### 예정 기능")
-    st.write("- Apps Script Webhook 연결 테스트")
-    st.write("- 보고서 payload 수신 테스트")
-    st.write("- 메일 초안 HTML 미리보기")
-    st.write("- Gmail 초안 생성")
-    st.write("- 실제 자동 발송 전환")
+    if check_list_payload:
+        check_cts = [item.get("ct_label", "") for item in check_list_payload]
+        st.write("- 우선점검 CT: " + ", ".join(check_cts))
+    else:
+        st.write("- 우선점검 CT: 해당 없음")
+
+    with st.expander("🧪 저장된 report payload 확인", expanded=False):
+        st.json(st.session_state.get("report_payload_json"))
 
     st.stop()
 
