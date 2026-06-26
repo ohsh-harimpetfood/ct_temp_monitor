@@ -73,8 +73,50 @@ if menu == "분석 프로그램":
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
 
 else:
+    else:
     st.title("📧 냉동 CT 자동보고서 관리")
     st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 기능을 실행합니다.")
+
+    st.markdown("### 1. Apps Script Webhook 연결 테스트")
+
+    webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
+    webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        if webhook_url:
+            st.success("Webhook URL 설정됨")
+        else:
+            st.error("Webhook URL 미설정")
+
+    with col_b:
+        if webhook_token:
+            st.success("Webhook Token 설정됨")
+        else:
+            st.error("Webhook Token 미설정")
+
+    if st.button("Webhook 연결 테스트", key="report_webhook_ping_button", use_container_width=True):
+        ping_result = webhook_client.post_webhook_ping(
+            webhook_url=webhook_url,
+            webhook_token=webhook_token,
+        )
+
+        st.session_state["webhook_ping_result"] = ping_result
+        st.session_state["webhook_ping_ok"] = bool(ping_result.get("ok"))
+
+    ping_result = st.session_state.get("webhook_ping_result")
+
+    if ping_result is not None:
+        if st.session_state.get("webhook_ping_ok"):
+            st.success("✅ Apps Script Webhook 연결 성공")
+        else:
+            st.error("❌ Apps Script Webhook 연결 실패")
+
+        with st.expander("Webhook 응답 확인", expanded=False):
+            st.json(ping_result)
+
+    st.divider()
 
     if not st.session_state.get("analysis_done"):
         st.warning("먼저 좌측 메뉴의 [분석 프로그램]에서 CSV 업로드 및 분석을 완료하세요.")
@@ -1546,25 +1588,6 @@ if uploaded_file is not None:
             st.json(report_payload_json)
       
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
-
-        st.markdown("#### 📡 Apps Script Webhook 연결 테스트")
-
-        if st.button("Webhook ping 테스트", use_container_width=True):
-            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
-            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
-        
-            ping_result = webhook_client.post_webhook_ping(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-            )
-        
-            if ping_result.get("ok"):
-                st.success("✅ Apps Script Webhook ping 성공")
-            else:
-                st.error("❌ Apps Script Webhook ping 실패")
-        
-            # token은 표시하지 않음
-            st.json(ping_result)
 
         st.markdown("#### 📤 Apps Script 보고서 payload 수신 테스트")
 
