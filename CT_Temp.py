@@ -1455,6 +1455,18 @@ if uploaded_file is not None:
             data_quality=data_quality_payload,
         )
 
+        # =========================================================
+        # 자동보고서 관리 화면에서 재사용할 분석 결과 저장
+        # =========================================================
+        st.session_state["analysis_done"] = True
+        st.session_state["report_payload_json"] = report_payload_json
+        st.session_state["report_meta"] = report_meta
+        st.session_state["summary_payload"] = summary_payload
+        st.session_state["heatmap_rows_payload"] = heatmap_rows_payload
+        st.session_state["check_list_payload"] = check_list_payload
+        st.session_state["metrics_payload"] = metrics_payload
+        st.session_state["data_quality_payload"] = data_quality_payload
+        
         
         with st.expander("🧪 자동메일 payload 확인"):
             st.write("schema_version:", report_payload.SCHEMA_VERSION)
