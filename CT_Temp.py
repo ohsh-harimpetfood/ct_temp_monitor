@@ -230,12 +230,25 @@ else:
         "보고서 내용을 확인한 뒤 전체 메일 발송 단계로 진행합니다."
     )
     
+    webhook_ready = bool(webhook_url) and bool(webhook_token)
+    payload_ready = report_payload_json is not None
+    can_generate_report = webhook_ready and payload_ready
+    
+    if not webhook_ready:
+        st.warning("Webhook URL 또는 Token 설정이 없어 자동보고서를 생성할 수 없습니다.")
+    
+    if not payload_ready:
+        st.warning("보고서 payload가 준비되지 않았습니다. 분석 프로그램에서 CSV 분석을 다시 완료하세요.")
+    
     if st.button(
         "🧾 자동보고서 생성 / 미리보기",
         key="main_preview_button",
         type="primary",
         use_container_width=True,
+        disabled=not can_generate_report,
     ):
+        st.session_state["main_preview_attempted"] = True
+    
         with st.spinner("자동보고서를 생성 중입니다..."):
             main_preview_result = webhook_client.post_report_preview(
                 webhook_url=webhook_url,
@@ -247,8 +260,6 @@ else:
         st.session_state["main_preview_result"] = main_preview_result
         st.session_state["main_preview_ok"] = bool(main_preview_result.get("ok"))
         st.session_state["send_confirmed"] = False
-    
-    main_preview_result = st.session_state.get("main_preview_result")
     
     if main_preview_result is not None:
         if st.session_state.get("main_preview_ok"):
@@ -1757,6 +1768,26 @@ if uploaded_file is not None:
             data_quality=data_quality_payload,
         )
 
+        current_payload_key = "|".join([
+            str(report_meta.get("report_date", "")),
+            str(report_meta.get("period_start", "")),
+            str(report_meta.get("period_end", "")),
+            str(report_meta.get("uploaded_filename", "")),
+            str(len(heatmap_rows_payload)),
+            str(len(check_list_payload)),
+            str(len(metrics_payload)),
+            str(data_quality_payload.get("valid_count", 0)),
+            str(data_quality_payload.get("invalid_count", 0)),
+        ])
+        
+        if st.session_state.get("report_payload_key") != current_payload_key:
+            st.session_state["main_preview_result"] = None
+            st.session_state["main_preview_ok"] = False
+            st.session_state["main_preview_attempted"] = False
+            st.session_state["send_confirmed"] = False
+        
+        st.session_state["report_payload_key"] = current_payload_key
+        
         # =========================================================
         # 자동보고서 관리 화면에서 재사용할 분석 결과 저장
         # =========================================================
