@@ -1195,9 +1195,19 @@ def create_container_heatmap(daily_status_df, heatmap_metric):
             height=430,
             margin=dict(l=50, r=30, t=60, b=40),
             plot_bgcolor="#000000",
-            paper_bgcolor="rgba(0,0,0,0)"
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(
+                type="category",
+                categoryorder="array",
+                categoryarray=dates
+            ),
+            yaxis=dict(
+                type="category",
+                categoryorder="array",
+                categoryarray=containers
+            )
         )
-
+        
         return fig
 
     value_df = (
@@ -1282,9 +1292,19 @@ def create_container_heatmap(daily_status_df, heatmap_metric):
         height=430,
         margin=dict(l=50, r=30, t=60, b=40),
         plot_bgcolor="#000000",
-        paper_bgcolor="rgba(0,0,0,0)"
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            type="category",
+            categoryorder="array",
+            categoryarray=dates
+        ),
+        yaxis=dict(
+            type="category",
+            categoryorder="array",
+            categoryarray=containers
+        )
     )
-
+    
     return fig
 
 
