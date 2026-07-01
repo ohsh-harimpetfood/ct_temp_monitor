@@ -432,6 +432,42 @@ def auto_adjust_excel_column_width(worksheet):
 def get_today_kst():
     return pd.Timestamp.now(tz="Asia/Seoul").date()
 
+def parse_measurement_datetime(series):
+    """
+    데이터로거 CSV 측정일시 호환 파서.
+    기존 형식과 변경된 날짜 형식을 모두 처리한다.
+    """
+
+    s = (
+        series.astype(str)
+        .str.strip()
+        .str.replace("\ufeff", "", regex=False)
+        .str.replace('"', "", regex=False)
+    )
+
+    # 1차: pandas 기본 파싱
+    parsed = pd.to_datetime(s, errors="coerce")
+
+    # 2차: pandas 버전에 따라 mixed format 지원 시 재시도
+    if parsed.isna().any():
+        try:
+            parsed_mixed = pd.to_datetime(s, errors="coerce", format="mixed")
+            parsed = parsed.fillna(parsed_mixed)
+        except TypeError:
+            pass
+
+    # 3차: 슬래시/점 날짜 백업
+    if parsed.isna().any():
+        s2 = (
+            s.str.replace("/", "-", regex=False)
+             .str.replace(".", "-", regex=False)
+        )
+
+        parsed2 = pd.to_datetime(s2, errors="coerce")
+        parsed = parsed.fillna(parsed2)
+
+    return parsed
+
 
 # =========================================================
 # 신규 플랫폼 CSV 전처리
@@ -460,7 +496,7 @@ def preprocess_new_platform_csv(uploaded_file):
 
     df = df_raw.rename(columns={timestamp_col: "측정일시", **ct_rename})
 
-    df["측정일시"] = pd.to_datetime(df["측정일시"], errors="coerce")
+    df["측정일시"] = parse_measurement_datetime(df["측정일시"])
     df = df.dropna(subset=["측정일시"]).copy()
 
     ct_cols = sorted(ct_rename.values(), key=ct_sort_key)
