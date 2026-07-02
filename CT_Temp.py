@@ -1875,94 +1875,9 @@ if uploaded_file is not None:
         st.session_state["check_list_payload"] = check_list_payload
         st.session_state["metrics_payload"] = metrics_payload
         st.session_state["data_quality_payload"] = data_quality_payload
-        
-        
-        with st.expander("🧪 자동메일 payload 확인"):
-            st.write("schema_version:", report_payload.SCHEMA_VERSION)
-            st.write("source:", report_payload.SOURCE)
-        
-            st.markdown("##### report_meta")
-            st.json(report_meta)
-        
-            st.markdown("##### summary")
-            st.json(summary_payload)
 
-            st.markdown("##### heatmap_rows")
-            st.caption(f"heatmap_rows total: {len(heatmap_rows_payload)}")
-            st.json(heatmap_rows_payload[:3])
-
-            st.markdown("##### check_list")
-            st.caption(f"check_list total: {len(check_list_payload)}")
-            st.json(check_list_payload)
-
-            st.markdown("##### metrics")
-            st.caption(f"metrics total: {len(metrics_payload)}")
-            st.json(metrics_payload[:3])
-
-            st.markdown("##### data_quality")
-            st.json(data_quality_payload)
-
-            st.markdown("##### final payload preview")
-            st.caption("실제 token은 화면에 노출하지 않고, 전송 직전에 Streamlit Secrets에서 주입할 예정입니다.")
-            st.json(report_payload_json)
-      
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
-        st.markdown("#### 📤 Apps Script 보고서 payload 수신 테스트")
-
-        if st.button("보고서 payload 전송 테스트", use_container_width=True):
-            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
-            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
-        
-            post_result = webhook_client.post_report_payload(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-                payload=report_payload_json,
-            )
-        
-            if post_result.get("ok"):
-                st.success("✅ Apps Script 보고서 payload 수신 성공")
-            else:
-                st.error("❌ Apps Script 보고서 payload 수신 실패")
-        
-            st.json(post_result)
-
-        st.markdown("#### 👀 메일 초안 미리보기")
-
-        if st.button("메일 초안 미리보기 생성", use_container_width=True):
-            webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
-            webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
-        
-            preview_result = webhook_client.post_report_preview(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-                payload=report_payload_json,
-            )
-        
-            if preview_result.get("ok"):
-                st.success("✅ 메일 미리보기 생성 성공")
-        
-                preview = preview_result.get("response", {}).get("preview", {})
-                html_body = preview.get("html_body", "")
-        
-                st.caption(f"받는 사람: {preview.get('to', '')}")
-                st.caption(f"제목: {preview.get('subject', '')}")
-        
-                with st.expander("📧 메일 미리보기 열기", expanded=True):
-                    components.html(
-                        html_body,
-                        height=900,
-                        scrolling=True,
-                    )
-        
-                with st.expander("🧪 미리보기 응답 JSON 확인", expanded=False):
-                    st.json(preview_result)
-        
-            else:
-                st.error("❌ 메일 미리보기 생성 실패")
-                st.json(preview_result)
-
-        
         render_v4_summary_dashboard(
             daily_status_df=daily_status_df,
             recent_df=recent_df,
@@ -1973,7 +1888,7 @@ if uploaded_file is not None:
             dashboard_start=dashboard_start,
             dashboard_today=dashboard_today
         )
-
+        
         st.divider()
         st.header("📋 기존 상세 분석 영역")
         st.caption("기존 부서별 확인 방식은 아래에 그대로 유지했습니다.")
