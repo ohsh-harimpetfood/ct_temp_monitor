@@ -301,7 +301,13 @@ else:
                     "아래 버튼을 누르면 실제 메일이 발송됩니다."
                 )
 
-            can_send_report = bool(send_confirmed) and main_preview_ok and webhook_ready and payload_ready
+            can_send_report = (
+                bool(send_confirmed)
+                and main_preview_ok
+                and webhook_ready
+                and payload_ready
+                and not st.session_state.get("send_ok", False)
+            )
 
             if st.button(
                 "📨 전체 메일 발송",
@@ -332,6 +338,7 @@ else:
                     send_info = response.get("send", {})
 
                     st.success("✅ 전체 메일 발송 완료")
+                    st.info("이미 발송 완료된 보고서입니다. 재발송하려면 CSV를 다시 분석하거나 미리보기를 새로 생성하세요.")
 
                     col_s1, col_s2 = st.columns([1, 2])
 
