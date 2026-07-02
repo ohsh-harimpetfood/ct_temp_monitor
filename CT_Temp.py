@@ -716,11 +716,15 @@ def get_metric_flags(row):
     eff = row["냉동효율(%)"]
     retention = row["-15℃이하유지율(%)"]
 
+    # 품질팀 피드백 반영:
+    # 과냉(효율 120% 초과)은 이탈로 보지 않고 참고지표로만 관리한다.
     temp_off = pd.notna(min_temp) and min_temp >= -16
 
     eff_low = pd.notna(eff) and eff < 70
     eff_high = pd.notna(eff) and eff > 120
-    eff_off = eff_low or eff_high
+
+    # 이탈 판정에는 효율 저하만 반영
+    eff_off = eff_low
 
     retention_off = pd.notna(retention) and retention <= 70
     eff_emergency = pd.notna(eff) and eff <= 60
@@ -731,11 +735,10 @@ def get_metric_flags(row):
 
     if temp_off:
         issues.append(f"최저온도 {min_temp:.1f}℃")
-    if eff_off:
-        if eff_low:
-            issues.append(f"냉동효율 저하 {eff:.1f}%")
-        else:
-            issues.append(f"냉동효율 과다 {eff:.1f}%")
+
+    if eff_low:
+        issues.append(f"냉동효율 저하 {eff:.1f}%")
+
     if retention_off:
         issues.append(f"-15℃ 유지율 저하 {retention:.1f}%")
 
@@ -746,7 +749,7 @@ def get_metric_flags(row):
         "temp_off": temp_off,
         "eff_off": eff_off,
         "eff_low": eff_low,
-        "eff_high": eff_high,
+        "eff_high": eff_high,  # 참고지표용으로는 유지
         "retention_off": retention_off,
         "eff_emergency": eff_emergency,
         "off_count": off_count,
@@ -764,10 +767,6 @@ def evaluate_daily_status(row):
     elif flags["eff_emergency"] or flags["off_count"] >= 2:
         status = "긴급점검"
         score = 3
-
-    elif flags["off_count"] == 1 and flags["eff_high"]:
-        status = "과냉주의"
-        score = 1
 
     else:
         status = "주의"
@@ -788,9 +787,6 @@ def calculate_deviation_score(row):
 
     if pd.notna(eff) and eff < 70:
         score = max(score, 70 - eff)
-
-    if pd.notna(eff) and eff > 120:
-        score = max(score, eff - 120)
 
     if pd.notna(retention) and retention <= 70:
         score = max(score, 70 - retention)
@@ -897,11 +893,6 @@ def build_status_tables(df_summary, today):
             risk_row = ct_recent[ct_recent["이탈수"] == 3].sort_values("측정일자_dt", ascending=False).iloc[0]
             대표이슈 = risk_row["이슈"]
 
-        elif today_off_count == 1 and today_flags["eff_high"]:
-            status = "과냉주의"
-            status_score = 1
-            대표이슈 = today_flags["issues"]
-
         elif recent_total_off == 0:
             status = "정상"
             status_score = 0
@@ -951,8 +942,8 @@ def build_status_tables(df_summary, today):
         })
 
         if status != "정상":
-            check_source = today_record if status in ["긴급점검", "과냉주의"] else ct_recent.sort_values(["상태점수", "이탈정도"], ascending=[False, False]).iloc[0]
-
+            check_source = today_record if status == "긴급점검" else ct_recent.sort_values(["상태점수", "이탈정도"], ascending=[False, False]).iloc[0]
+            
             check_rows.append({
                 "상태": status,
                 "컨테이너": ct,
