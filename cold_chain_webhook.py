@@ -166,4 +166,58 @@ def post_report_preview(webhook_url, webhook_token, payload, timeout=30):
             "error": str(e),
         }
 
+def post_report_send(webhook_url, webhook_token, payload, timeout=60):
+    """
+    Apps Script Webhook으로 실제 메일 발송 요청을 보낸다.
+    mode = send
+    """
 
+    if not webhook_url:
+        return {
+            "ok": False,
+            "error": "APPS_SCRIPT_WEBHOOK_URL이 설정되지 않았습니다."
+        }
+
+    if not webhook_token:
+        return {
+            "ok": False,
+            "error": "REPORT_WEBHOOK_TOKEN이 설정되지 않았습니다."
+        }
+
+    if payload is None:
+        return {
+            "ok": False,
+            "error": "전송할 report payload가 없습니다."
+        }
+
+    try:
+        import requests
+
+        send_payload = dict(payload)
+        send_payload["token"] = webhook_token
+        send_payload["mode"] = "send"
+
+        response = requests.post(
+            webhook_url,
+            json=send_payload,
+            timeout=timeout,
+        )
+
+        try:
+            response_json = response.json()
+        except Exception:
+            response_json = {
+                "raw_text": response.text
+            }
+
+        return {
+            "ok": response.ok and bool(response_json.get("ok")),
+            "status_code": response.status_code,
+            "response": response_json,
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e)
+        }
