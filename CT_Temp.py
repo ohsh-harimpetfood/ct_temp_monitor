@@ -94,6 +94,12 @@ if "main_preview_ok" not in st.session_state:
 if "send_confirmed" not in st.session_state:
     st.session_state["send_confirmed"] = False
 
+if "send_result" not in st.session_state:
+    st.session_state["send_result"] = None
+
+if "send_ok" not in st.session_state:
+    st.session_state["send_ok"] = False
+
 if "main_preview_attempted" not in st.session_state:
     st.session_state["main_preview_attempted"] = False
 
@@ -220,6 +226,8 @@ else:
         st.session_state["main_preview_result"] = None
         st.session_state["main_preview_ok"] = False
         st.session_state["send_confirmed"] = False
+        st.session_state["send_result"] = None
+        st.session_state["send_ok"] = False
 
         with st.spinner("자동보고서를 생성 중입니다..."):
             result = webhook_client.post_report_preview(
@@ -293,15 +301,60 @@ else:
                     "다음 단계에서 Apps Script send mode와 Streamlit 발송 버튼을 연결합니다."
                 )
 
-            st.button(
-                "📨 전체 메일 발송",
-                key="main_send_button_disabled",
-                type="primary",
-                use_container_width=True,
-                disabled=True,
-            )
-
-            st.caption("현재 단계에서는 발송 버튼을 비활성화했습니다. 다음 단계에서 실제 발송 기능을 연결합니다.")
+        can_send_report = bool(send_confirmed) and main_preview_ok and webhook_ready and payload_ready
+        
+        if st.button(
+            "📨 전체 메일 발송",
+            key="main_send_button",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_send_report,
+        ):
+            st.session_state["send_result"] = None
+            st.session_state["send_ok"] = False
+        
+            with st.spinner("전체 메일을 발송 중입니다..."):
+                send_result = webhook_client.post_report_send(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=90,
+                )
+        
+            st.session_state["send_result"] = send_result
+            st.session_state["send_ok"] = bool(send_result.get("ok"))
+        
+        send_result = st.session_state.get("send_result")
+        
+        if send_result is not None:
+            if st.session_state.get("send_ok"):
+                response = send_result.get("response", {})
+                send_info = response.get("send", {})
+        
+                st.success("✅ 전체 메일 발송 완료")
+        
+                col_s1, col_s2 = st.columns([1, 2])
+        
+                with col_s1:
+                    st.caption("수신자")
+                    st.write(send_info.get("to", "-"))
+        
+                with col_s2:
+                    st.caption("제목")
+                    st.write(send_info.get("subject", "-"))
+        
+                st.caption(
+                    f"수신처 모드: {send_info.get('recipient_mode', '-')} / "
+                    f"발송시각: {send_info.get('sent_time', '-')}"
+                )
+        
+            else:
+                st.error("❌ 전체 메일 발송 실패")
+        
+            if st.checkbox("메일 발송 응답 JSON 보기", key="show_send_result_json"):
+                st.json(send_result)
+        else:
+            st.caption("보고서 내용과 수신자를 확인하면 발송 버튼이 활성화됩니다.")
 
             if st.checkbox("자동보고서 생성 응답 JSON 보기", key="show_main_preview_json"):
                 st.json(main_preview_result)
@@ -1861,6 +1914,8 @@ if uploaded_file is not None:
             st.session_state["main_preview_ok"] = False
             st.session_state["main_preview_attempted"] = False
             st.session_state["send_confirmed"] = False
+            st.session_state["send_result"] = None
+            st.session_state["send_ok"] = False
         
         st.session_state["report_payload_key"] = current_payload_key
         
