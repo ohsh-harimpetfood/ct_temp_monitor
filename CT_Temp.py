@@ -306,7 +306,7 @@ else:
             if st.checkbox("자동보고서 생성 응답 JSON 보기", key="show_main_preview_json"):
                 st.json(main_preview_result)
 
-        else:
+        elif main_preview_attempted:
             st.error("❌ 자동보고서 생성 실패")
 
             if st.checkbox("실패 응답 JSON 보기", key="show_main_preview_error_json"):
@@ -1765,6 +1765,9 @@ def create_excel_download(
 # =========================================================
 # Streamlit 실행부
 # =========================================================
+if menu != "분석 프로그램":
+    st.stop()
+
 uploaded_file = st.file_uploader(
     "신규 플랫폼 CSV 파일을 업로드하세요",
     type="csv"
