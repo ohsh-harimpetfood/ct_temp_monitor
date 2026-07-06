@@ -7,6 +7,18 @@ import pandas as pd
 SCHEMA_VERSION = "cold_chain_report_v1"
 SOURCE = "streamlit"
 
+DAILY_SUMMARY_COLUMNS = [
+    "컨테이너",
+    "측정일자",
+    "요일",
+    "최저온도",
+    "평균누적온도",
+    "측정면적",
+    "목표면적",
+    "냉동효율(%)",
+    "-15℃이하유지율(%)",
+    "측정건수",
+]
 
 def build_report_meta(
     report_date,
@@ -410,6 +422,63 @@ def build_metrics(container_status_df):
 
     return rows
 
+def build_daily_summary_rows(df_summary):
+    """
+    공식 데이터셋 '데이터 다운로드' 시트에 적재할 일자별 CT 분석결과 payload를 생성한다.
+
+    기준 컬럼:
+    - 컨테이너
+    - 측정일자
+    - 요일
+    - 최저온도
+    - 평균누적온도
+    - 측정면적
+    - 목표면적
+    - 냉동효율(%)
+    - -15℃이하유지율(%)
+    - 측정건수
+    """
+
+    if df_summary is None or df_summary.empty:
+        return []
+
+    missing_cols = [
+        col for col in DAILY_SUMMARY_COLUMNS
+        if col not in df_summary.columns
+    ]
+
+    if missing_cols:
+        raise ValueError(
+            "daily_summary_rows 생성 실패. 누락 컬럼: "
+            + ", ".join(missing_cols)
+        )
+
+    df = df_summary[DAILY_SUMMARY_COLUMNS].copy()
+
+    rows = []
+
+    for _, row in df.iterrows():
+        container = str(row.get("컨테이너", "")).strip()
+        measure_date = format_date_string(row.get("측정일자"))
+
+        # 핵심 키가 없는 행은 적재 대상에서 제외한다.
+        if not container or not measure_date:
+            continue
+
+        rows.append({
+            "컨테이너": container,
+            "측정일자": measure_date,
+            "요일": str(row.get("요일", "")).strip(),
+            "최저온도": safe_float_or_none(row.get("최저온도")),
+            "평균누적온도": safe_float_or_none(row.get("평균누적온도")),
+            "측정면적": safe_int_or_none(row.get("측정면적")),
+            "목표면적": safe_int_or_none(row.get("목표면적")),
+            "냉동효율(%)": safe_float_or_none(row.get("냉동효율(%)")),
+            "-15℃이하유지율(%)": safe_float_or_none(row.get("-15℃이하유지율(%)")),
+            "측정건수": safe_int_or_none(row.get("측정건수")),
+        })
+
+    return rows
 
 def build_data_quality(df_raw, df_long, abnormal_count, excluded_count):
     """
@@ -459,6 +528,7 @@ def build_report_payload(
     check_list,
     metrics,
     data_quality,
+    daily_summary_rows=None,
     token=None,
 ):
     """
@@ -480,6 +550,7 @@ def build_report_payload(
         "check_list": check_list,
         "metrics": metrics,
         "data_quality": data_quality,
+        "daily_summary_rows": daily_summary_rows or [],
     }
 
     # 실제 전송 시에만 token을 넣는다.
