@@ -110,7 +110,6 @@ if "main_preview_attempted" not in st.session_state:
 if menu == "분석 프로그램":
     st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.2")
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
-    st.caption(f"report_payload module: {report_payload.__file__}")
 
 else:
     st.title("📧 냉동 CT 자동보고서 관리")
