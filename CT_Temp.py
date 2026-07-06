@@ -117,12 +117,32 @@ st.markdown(
         margin-top: 8px;
         margin-bottom: 14px;
     }
-    # Store 버튼 전용 스타일
-    #store-button-anchor + div[data-testid="stButton"] > button {
-        background: #facc15 !important;
+
+        /* Store 실행 버튼 전용 */
+    .st-key-store_dataset_button button {
+        background-color: #facc15 !important;
         color: #111827 !important;
         border: 1px solid #eab308 !important;
-        font-weight: 800 !important;
+        font-weight: 900 !important;
+    }
+    
+    .st-key-store_dataset_button button:hover {
+        background-color: #eab308 !important;
+        color: #111827 !important;
+        border: 1px solid #ca8a04 !important;
+    }
+    
+    .st-key-store_dataset_button button:active {
+        background-color: #ca8a04 !important;
+        color: #111827 !important;
+        border: 1px solid #a16207 !important;
+    }
+    
+    .st-key-store_dataset_button button:disabled {
+        background-color: #78716c !important;
+        color: #d6d3d1 !important;
+        border: 1px solid #57534e !important;
+        opacity: 0.75 !important;
     }
     
     #store-button-anchor + div[data-testid="stButton"] > button:hover {
@@ -419,8 +439,6 @@ def render_auto_report_page():
             """,
             unsafe_allow_html=True,
         )
-
-        st.markdown('<div id="store-button-anchor"></div>', unsafe_allow_html=True)
 
         if st.button(
             "💾 Store 실행",
