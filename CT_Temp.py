@@ -14,7 +14,6 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
 
 
-
 # =========================================================
 # Streamlit 기본 설정
 # =========================================================
@@ -128,6 +127,11 @@ else:
     webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
     webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
 
+    webhook_ready = bool(webhook_url) and bool(webhook_token)
+    payload_ready = report_payload_json is not None
+    daily_rows_ready = len(daily_summary_rows_payload) > 0
+    can_store_dataset = webhook_ready and payload_ready and daily_rows_ready
+
     if not st.session_state.get("analysis_done"):
         st.warning("먼저 좌측 메뉴의 [분석 프로그램]에서 CSV 업로드 및 분석을 완료하세요.")
 
@@ -220,10 +224,6 @@ st.info(
     "중복 기준은 컨테이너 + 측정일자이며, 기존에 있으나 이번 분석에 없는 행은 삭제하지 않습니다."
 )
 
-webhook_ready = bool(webhook_url) and bool(webhook_token)
-payload_ready = report_payload_json is not None
-daily_rows_ready = len(daily_summary_rows_payload) > 0
-can_store_dataset = webhook_ready and payload_ready and daily_rows_ready
 
 col_store_1, col_store_2, col_store_3 = st.columns(3)
 
