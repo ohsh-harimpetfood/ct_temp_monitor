@@ -22,6 +22,113 @@ st.set_page_config(
     layout="wide"
 )
 
+# =========================================================
+# 공통 UI 스타일 / 앵커 이동
+# =========================================================
+st.markdown(
+    """
+    <style>
+    html {
+        scroll-behavior: smooth;
+    }
+
+    .section-anchor {
+        display: block;
+        position: relative;
+        top: -90px;
+        visibility: hidden;
+    }
+
+    .sidebar-nav-title {
+        font-size: 0.86rem;
+        font-weight: 800;
+        margin-top: 1.1rem;
+        margin-bottom: 0.35rem;
+        color: #9ca3af;
+    }
+
+    .sidebar-nav a {
+        display: block;
+        padding: 0.28rem 0.1rem;
+        color: #e5e7eb;
+        text-decoration: none;
+        font-size: 0.86rem;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+
+    .sidebar-nav a:hover {
+        color: #ffffff;
+        text-decoration: underline;
+    }
+
+    .cc-action-card {
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 14px;
+        padding: 18px 18px 14px 18px;
+        background: rgba(15, 23, 42, 0.55);
+        min-height: 178px;
+        margin-bottom: 12px;
+    }
+
+    .cc-action-card-title {
+        font-size: 1.15rem;
+        font-weight: 850;
+        color: #ffffff;
+        margin-bottom: 8px;
+    }
+
+    .cc-action-card-desc {
+        font-size: 0.9rem;
+        color: #cbd5e1;
+        line-height: 1.55;
+        margin-bottom: 12px;
+    }
+
+    .cc-mini-label {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .cc-mini-value {
+        font-size: 1.25rem;
+        color: #ffffff;
+        font-weight: 850;
+    }
+
+    .cc-step-note {
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: rgba(30, 64, 175, 0.28);
+        border: 1px solid rgba(59, 130, 246, 0.35);
+        color: #bfdbfe;
+        font-size: 0.92rem;
+        font-weight: 650;
+        margin-bottom: 16px;
+    }
+
+    .cc-result-box {
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: rgba(15, 23, 42, 0.45);
+        margin-top: 8px;
+        margin-bottom: 14px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+def section_anchor(anchor_id: str):
+    st.markdown(
+        f'<span id="{anchor_id}" class="section-anchor"></span>',
+        unsafe_allow_html=True,
+    )
+
 with st.sidebar:
     st.markdown("### ❄ 냉동 CT 관리")
     menu = st.radio(
@@ -33,6 +140,43 @@ with st.sidebar:
         index=0
     )
 
+    st.markdown("---")
+
+    if menu == "분석 프로그램":
+        st.markdown(
+            """
+            <div class="sidebar-nav-title">📌 화면 바로가기</div>
+            <div class="sidebar-nav">
+              <a href="#upload-section">파일 업로드</a>
+              <a href="#dashboard-section">V4 상태 대시보드</a>
+              <a href="#card-section">컨테이너 상태 카드</a>
+              <a href="#checklist-section">우선 점검 리스트</a>
+              <a href="#heatmap-section">컨테이너 × 일자 히트맵</a>
+              <a href="#detail-section">기존 상세 분석</a>
+              <a href="#daily-result-section">날짜별 분석결과</a>
+              <a href="#temp-chart-section">온도 추이 그래프</a>
+              <a href="#summary-table-section">요약 테이블</a>
+              <a href="#metric-chart-section">일자별 지표 비교</a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    else:
+        st.markdown(
+            """
+            <div class="sidebar-nav-title">📌 화면 바로가기</div>
+            <div class="sidebar-nav">
+              <a href="#auto-summary-section">현재 분석 상태</a>
+              <a href="#auto-action-section">실행 버튼</a>
+              <a href="#store-result-section">Store 결과</a>
+              <a href="#preview-result-section">보고서 미리보기</a>
+              <a href="#send-section">최종 메일 발송</a>
+              <a href="#admin-section">관리자 / 테스트 기능</a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # =========================================================
 # Session State 초기화
@@ -118,7 +262,7 @@ if "main_preview_attempted" not in st.session_state:
 
 def render_auto_report_page():
     st.title("📧 냉동 CT 자동보고서 관리")
-    st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 자동보고서 초안을 생성합니다.")
+    st.caption("분석 프로그램에서 CSV 분석을 완료한 뒤 Store, 미리보기, 최종 발송을 진행합니다.")
 
     webhook_url = st.secrets.get("APPS_SCRIPT_WEBHOOK_URL", "")
     webhook_token = st.secrets.get("REPORT_WEBHOOK_TOKEN", "")
@@ -183,11 +327,22 @@ def render_auto_report_page():
     can_store_dataset = webhook_ready and payload_ready and daily_rows_ready
     can_generate_report = webhook_ready and payload_ready
 
-    st.success("✅ 분석 결과 payload가 준비되어 있습니다.")
+    # =========================================================
+    # 현재 분석 상태
+    # =========================================================
+    section_anchor("auto-summary-section")
 
     st.markdown("### 현재 분석 상태")
+    st.markdown(
+        """
+        <div class="cc-step-note">
+        권장 순서: ① Store / 공식 데이터셋 적재 → ② 자동보고서 생성 / 미리보기 → ③ 최종 메일 발송
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
         st.metric("기준일", report_meta.get("report_date", "-"))
@@ -199,14 +354,16 @@ def render_auto_report_page():
         st.metric("우선점검", f"{len(check_list_payload)}대")
 
     with col4:
-        st.metric("정상", f"{summary_payload.get('normal', 0)}대")
+        st.metric("daily rows", f"{len(daily_summary_rows_payload):,}건")
+
+    with col5:
+        st.metric("유효 데이터", f"{data_quality_payload.get('valid_count', 0):,}건")
 
     st.caption(
         f"분석기간: {report_meta.get('period_start', '-')} ~ {report_meta.get('period_end', '-')} / "
-        f"daily rows {len(daily_summary_rows_payload)}건 / "
         f"히트맵 {len(heatmap_rows_payload)}건 / "
         f"metrics {len(metrics_payload)}건 / "
-        f"유효 데이터 {data_quality_payload.get('valid_count', 0):,}건"
+        f"업로드 파일: {report_meta.get('uploaded_filename', '-')}"
     )
 
     if check_list_payload:
@@ -218,59 +375,124 @@ def render_auto_report_page():
     st.divider()
 
     # =========================================================
-    # Store / 공식 데이터셋 적재
+    # 핵심 실행 버튼 2열
     # =========================================================
-    st.markdown("### Store / 공식 데이터셋 적재")
-    st.info(
-        "현재 분석 결과의 daily_summary_rows를 Google Sheet '데이터 다운로드' 시트에 반영합니다. "
-        "중복 기준은 컨테이너 + 측정일자이며, 기존에 있으나 이번 분석에 없는 행은 삭제하지 않습니다."
-    )
+    section_anchor("auto-action-section")
 
-    col_store_1, col_store_2, col_store_3 = st.columns(3)
+    st.markdown("### 실행")
+    action_col_1, action_col_2 = st.columns(2, gap="large")
 
-    with col_store_1:
-        st.metric("적재 대상 rows", f"{len(daily_summary_rows_payload):,}건")
+    with action_col_1:
+        st.markdown(
+            f"""
+            <div class="cc-action-card">
+                <div class="cc-action-card-title">💾 Store / 공식 데이터셋 적재</div>
+                <div class="cc-action-card-desc">
+                    현재 분석 결과의 daily_summary_rows를 Google Sheet <b>데이터 다운로드</b> 시트에 반영합니다.
+                    중복 기준은 <b>컨테이너 + 측정일자</b>입니다.
+                </div>
+                <div class="cc-mini-label">적재 대상</div>
+                <div class="cc-mini-value">{len(daily_summary_rows_payload):,}건</div>
+                <div class="cc-mini-label" style="margin-top:8px;">대상 시트</div>
+                <div class="cc-mini-value">데이터 다운로드</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    with col_store_2:
-        st.metric("중복 기준", "CT + 측정일자")
+        if st.button(
+            "💾 Store 실행",
+            key="store_dataset_button",
+            type="secondary",
+            use_container_width=True,
+            disabled=not can_store_dataset,
+        ):
+            st.session_state["store_attempted"] = True
+            st.session_state["store_result"] = None
+            st.session_state["store_ok"] = False
 
-    with col_store_3:
-        st.metric("대상 시트", "데이터 다운로드")
+            with st.spinner("공식 데이터셋에 적재 중입니다..."):
+                store_result = webhook_client.post_report_store(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=90,
+                )
+
+            st.session_state["store_result"] = store_result
+            st.session_state["store_ok"] = bool(store_result.get("ok"))
+
+    with action_col_2:
+        st.markdown(
+            f"""
+            <div class="cc-action-card">
+                <div class="cc-action-card-title">🧾 자동보고서 생성 / 미리보기</div>
+                <div class="cc-action-card-desc">
+                    현재 분석 결과를 기준으로 발송 전 보고서를 생성합니다.
+                    보고서 내용과 수신자를 확인한 뒤 최종 메일 발송 단계로 진행합니다.
+                </div>
+                <div class="cc-mini-label">Payload 상태</div>
+                <div class="cc-mini-value">{"준비 완료" if payload_ready else "미준비"}</div>
+                <div class="cc-mini-label" style="margin-top:8px;">Webhook 상태</div>
+                <div class="cc-mini-value">{"연결 정보 있음" if webhook_ready else "설정 필요"}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if st.button(
+            "🧾 자동보고서 생성 / 미리보기",
+            key="main_preview_button",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_generate_report,
+        ):
+            st.session_state["main_preview_attempted"] = True
+            st.session_state["main_preview_result"] = None
+            st.session_state["main_preview_ok"] = False
+            st.session_state["send_confirmed"] = False
+            st.session_state["send_result"] = None
+            st.session_state["send_ok"] = False
+
+            with st.spinner("자동보고서를 생성 중입니다..."):
+                result = webhook_client.post_report_preview(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=60,
+                )
+
+            st.session_state["main_preview_result"] = result
+            st.session_state["main_preview_ok"] = bool(result.get("ok"))
 
     if not webhook_ready:
-        st.warning("Webhook URL 또는 Token 설정이 없어 Store를 실행할 수 없습니다.")
+        st.warning("Webhook URL 또는 Token 설정이 없어 Store/자동보고서 기능을 실행할 수 없습니다.")
 
     if not payload_ready:
         st.warning("보고서 payload가 준비되지 않았습니다. 분석 프로그램에서 CSV 분석을 다시 완료하세요.")
 
     if not daily_rows_ready:
-        st.warning("daily_summary_rows가 비어 있습니다. CSV 분석 결과를 다시 확인하세요.")
+        st.warning("daily_summary_rows가 비어 있어 Store를 실행할 수 없습니다.")
 
-    if st.button(
-        "💾 Store",
-        key="store_dataset_button",
-        type="secondary",
-        use_container_width=True,
-        disabled=not can_store_dataset,
-    ):
-        st.session_state["store_attempted"] = True
-        st.session_state["store_result"] = None
-        st.session_state["store_ok"] = False
+    st.divider()
 
-        with st.spinner("공식 데이터셋에 적재 중입니다..."):
-            store_result = webhook_client.post_report_store(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-                payload=report_payload_json,
-                timeout=90,
-            )
-
-        st.session_state["store_result"] = store_result
-        st.session_state["store_ok"] = bool(store_result.get("ok"))
+    # =========================================================
+    # 실행 결과 영역
+    # =========================================================
+    st.markdown("### 실행 결과")
 
     store_result = st.session_state.get("store_result")
     store_attempted = st.session_state.get("store_attempted", False)
     store_ok = st.session_state.get("store_ok", False)
+
+    main_preview_result = st.session_state.get("main_preview_result")
+    main_preview_attempted = st.session_state.get("main_preview_attempted", False)
+    main_preview_ok = st.session_state.get("main_preview_ok", False)
+
+    # Store 결과
+    section_anchor("store-result-section")
+
+    st.markdown("#### 1) Store 결과")
 
     if store_attempted and store_result is not None:
         if store_ok:
@@ -308,51 +530,15 @@ def render_auto_report_page():
         if st.checkbox("Store 응답 JSON 보기", key="show_store_result_json"):
             st.json(store_result)
 
+    else:
+        st.info("아직 Store를 실행하지 않았습니다.")
+
     st.divider()
 
-    # =========================================================
-    # 자동보고서 생성 / 미리보기
-    # =========================================================
-    st.markdown("### 자동보고서 생성 / 미리보기")
-    st.info(
-        "현재 분석 결과를 기준으로 발송 전 자동보고서를 생성합니다. "
-        "보고서 내용을 확인한 뒤 전체 메일 발송 단계로 진행합니다."
-    )
+    # 미리보기 결과
+    section_anchor("preview-result-section")
 
-    if not webhook_ready:
-        st.warning("Webhook URL 또는 Token 설정이 없어 자동보고서를 생성할 수 없습니다.")
-
-    if not payload_ready:
-        st.warning("보고서 payload가 준비되지 않았습니다. 분석 프로그램에서 CSV 분석을 다시 완료하세요.")
-
-    if st.button(
-        "🧾 자동보고서 생성 / 미리보기",
-        key="main_preview_button",
-        type="primary",
-        use_container_width=True,
-        disabled=not can_generate_report,
-    ):
-        st.session_state["main_preview_attempted"] = True
-        st.session_state["main_preview_result"] = None
-        st.session_state["main_preview_ok"] = False
-        st.session_state["send_confirmed"] = False
-        st.session_state["send_result"] = None
-        st.session_state["send_ok"] = False
-
-        with st.spinner("자동보고서를 생성 중입니다..."):
-            result = webhook_client.post_report_preview(
-                webhook_url=webhook_url,
-                webhook_token=webhook_token,
-                payload=report_payload_json,
-                timeout=60,
-            )
-
-        st.session_state["main_preview_result"] = result
-        st.session_state["main_preview_ok"] = bool(result.get("ok"))
-
-    main_preview_result = st.session_state.get("main_preview_result")
-    main_preview_attempted = st.session_state.get("main_preview_attempted", False)
-    main_preview_ok = st.session_state.get("main_preview_ok", False)
+    st.markdown("#### 2) 자동보고서 미리보기 결과")
 
     if main_preview_attempted:
         if main_preview_ok and main_preview_result is not None:
@@ -388,8 +574,7 @@ def render_auto_report_page():
                     st.metric("metrics", received.get("metrics_count", 0))
 
             if html_body:
-                st.markdown("#### 보고서 미리보기")
-
+                st.markdown("##### 보고서 미리보기")
                 components.html(
                     html_body,
                     height=980,
@@ -397,82 +582,6 @@ def render_auto_report_page():
                 )
             else:
                 st.warning("미리보기 HTML이 비어 있습니다.")
-
-            st.markdown("#### 최종 발송 확인")
-
-            send_confirmed = st.checkbox(
-                "보고서 내용과 수신자를 확인했습니다.",
-                key="send_confirmed",
-            )
-
-            if send_confirmed:
-                st.warning(
-                    "수신자와 보고서 내용을 확인했습니다. "
-                    "아래 버튼을 누르면 실제 메일이 발송됩니다."
-                )
-
-            can_send_report = (
-                bool(send_confirmed)
-                and main_preview_ok
-                and webhook_ready
-                and payload_ready
-                and not st.session_state.get("send_ok", False)
-            )
-
-            if st.button(
-                "📨 전체 메일 발송",
-                key="main_send_button",
-                type="primary",
-                use_container_width=True,
-                disabled=not can_send_report,
-            ):
-                st.session_state["send_result"] = None
-                st.session_state["send_ok"] = False
-
-                with st.spinner("전체 메일을 발송 중입니다..."):
-                    send_result = webhook_client.post_report_send(
-                        webhook_url=webhook_url,
-                        webhook_token=webhook_token,
-                        payload=report_payload_json,
-                        timeout=90,
-                    )
-
-                st.session_state["send_result"] = send_result
-                st.session_state["send_ok"] = bool(send_result.get("ok"))
-
-            send_result = st.session_state.get("send_result")
-
-            if send_result is not None:
-                if st.session_state.get("send_ok"):
-                    response = send_result.get("response", {})
-                    send_info = response.get("send", {})
-
-                    st.success("✅ 전체 메일 발송 완료")
-                    st.info("이미 발송 완료된 보고서입니다. 재발송하려면 CSV를 다시 분석하거나 미리보기를 새로 생성하세요.")
-
-                    col_s1, col_s2 = st.columns([1, 2])
-
-                    with col_s1:
-                        st.caption("수신자")
-                        st.write(send_info.get("to", "-"))
-
-                    with col_s2:
-                        st.caption("제목")
-                        st.write(send_info.get("subject", "-"))
-
-                    st.caption(
-                        f"수신처 모드: {send_info.get('recipient_mode', '-')} / "
-                        f"발송시각: {send_info.get('sent_time', '-')}"
-                    )
-
-                else:
-                    st.error("❌ 전체 메일 발송 실패")
-
-                if st.checkbox("메일 발송 응답 JSON 보기", key="show_send_result_json"):
-                    st.json(send_result)
-
-            else:
-                st.caption("보고서 내용과 수신자를 확인하면 발송 버튼이 활성화됩니다.")
 
             if st.checkbox("자동보고서 생성 응답 JSON 보기", key="show_main_preview_json"):
                 st.json(main_preview_result)
@@ -483,11 +592,97 @@ def render_auto_report_page():
             if st.checkbox("실패 응답 JSON 보기", key="show_main_preview_error_json"):
                 st.json(main_preview_result)
 
+    else:
+        st.info("아직 자동보고서 미리보기를 생성하지 않았습니다.")
+
+    st.divider()
+
+    # 최종 발송
+    section_anchor("send-section")
+
+    st.markdown("#### 3) 최종 메일 발송")
+
+    if main_preview_ok and main_preview_result is not None:
+        send_confirmed = st.checkbox(
+            "보고서 내용과 수신자를 확인했습니다.",
+            key="send_confirmed",
+        )
+
+        if send_confirmed:
+            st.warning(
+                "수신자와 보고서 내용을 확인했습니다. 아래 버튼을 누르면 실제 메일이 발송됩니다."
+            )
+
+        can_send_report = (
+            bool(send_confirmed)
+            and main_preview_ok
+            and webhook_ready
+            and payload_ready
+            and not st.session_state.get("send_ok", False)
+        )
+
+        if st.button(
+            "📨 전체 메일 발송",
+            key="main_send_button",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_send_report,
+        ):
+            st.session_state["send_result"] = None
+            st.session_state["send_ok"] = False
+
+            with st.spinner("전체 메일을 발송 중입니다..."):
+                send_result = webhook_client.post_report_send(
+                    webhook_url=webhook_url,
+                    webhook_token=webhook_token,
+                    payload=report_payload_json,
+                    timeout=90,
+                )
+
+            st.session_state["send_result"] = send_result
+            st.session_state["send_ok"] = bool(send_result.get("ok"))
+
+        send_result = st.session_state.get("send_result")
+
+        if send_result is not None:
+            if st.session_state.get("send_ok"):
+                response = send_result.get("response", {})
+                send_info = response.get("send", {})
+
+                st.success("✅ 전체 메일 발송 완료")
+                st.info("이미 발송 완료된 보고서입니다. 재발송하려면 CSV를 다시 분석하거나 미리보기를 새로 생성하세요.")
+
+                col_s1, col_s2 = st.columns([1, 2])
+
+                with col_s1:
+                    st.caption("수신자")
+                    st.write(send_info.get("to", "-"))
+
+                with col_s2:
+                    st.caption("제목")
+                    st.write(send_info.get("subject", "-"))
+
+                st.caption(
+                    f"수신처 모드: {send_info.get('recipient_mode', '-')} / "
+                    f"발송시각: {send_info.get('sent_time', '-')}"
+                )
+
+            else:
+                st.error("❌ 전체 메일 발송 실패")
+
+            if st.checkbox("메일 발송 응답 JSON 보기", key="show_send_result_json"):
+                st.json(send_result)
+
+    else:
+        st.info("최종 발송은 자동보고서 미리보기 생성 후 활성화됩니다.")
+
     st.divider()
 
     # =========================================================
     # 관리자 / 테스트 기능
     # =========================================================
+    section_anchor("admin-section")
+
     with st.expander("🔧 관리자 / 테스트 기능", expanded=False):
         st.caption("일반 운영자는 열지 않아도 됩니다. 연결 점검, 미리보기, 전송 데이터 확인용입니다.")
 
@@ -530,7 +725,7 @@ def render_auto_report_page():
         st.markdown("---")
 
         st.markdown("#### 2) 데이터 전송 검증")
-        st.caption("현재 payload가 Apps Script에서 정상 수신되는지 확인합니다. Gmail 초안은 생성하지 않습니다.")
+        st.caption("현재 payload가 Apps Script에서 정상 수신되는지 확인합니다.")
 
         if st.button("데이터 전송 검증", key="admin_payload_test_button", use_container_width=True):
             with st.spinner("Payload 수신 상태를 확인 중입니다..."):
@@ -571,6 +766,7 @@ def render_auto_report_page():
                     f"mode: {received.get('mode', '-')} / "
                     f"report_date: {received.get('report_date', '-')}"
                 )
+
             else:
                 st.error("❌ 데이터 전송 검증 실패")
 
@@ -578,7 +774,6 @@ def render_auto_report_page():
                 st.json(payload_test_result)
 
         st.markdown("---")
-
         st.markdown("#### 3) 전송 데이터 상세 보기")
 
         if st.checkbox("저장된 report payload JSON 보기", key="show_saved_payload_json"):
@@ -586,7 +781,8 @@ def render_auto_report_page():
 
 
 if menu == "분석 프로그램":
-    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.2")
+    section_anchor("upload-section")
+    st.title("❄ 냉동 컨테이너 온도관리 플랫폼.V4.3")
     st.caption("신규 데이터로거 플랫폼 CSV 전용 | 이상값 기준: -50℃ 미만 또는 60℃ 초과 → 결측치 처리")
 else:
     render_auto_report_page()
@@ -1149,6 +1345,7 @@ def status_color(status):
 
 
 def render_status_cards(container_status_df):
+    section_anchor("card-section")
     st.markdown("#### 🧊 컨테이너 상태 카드")
 
     if container_status_df.empty:
@@ -1224,6 +1421,7 @@ def render_v4_summary_dashboard(
     dashboard_today
 ):
     st.divider()
+    section_anchor("dashboard-section")
     st.header("🚦 V4 컨테이너 상태 대시보드")
     st.caption(
         f"상단 대시보드는 한국 날짜 기준 최근 3일({dashboard_start} ~ {dashboard_today})만 사용합니다. "
@@ -1270,6 +1468,7 @@ def render_v4_summary_dashboard(
 
     render_status_cards(container_status_df)
 
+    section_anchor("checklist-section")
     st.markdown("#### 🔎 우선 점검 리스트")
 
     if check_list_df.empty:
@@ -1281,6 +1480,7 @@ def render_v4_summary_dashboard(
             height=230
         )
 
+    section_anchor("heatmap-section")
     st.markdown("#### 🗓️ 컨테이너 × 일자 히트맵")
 
     heatmap_metric = st.radio(
@@ -2069,6 +2269,7 @@ if uploaded_file is not None:
         )
         
         st.divider()
+        section_anchor("detail-section")
         st.header("📋 기존 상세 분석 영역")
         st.caption("기존 부서별 확인 방식은 아래에 그대로 유지했습니다.")
 
@@ -2105,6 +2306,7 @@ if uploaded_file is not None:
                     height=220
                 )
 
+        section_anchor("daily-result-section")
         st.subheader("📊 컨테이너별 날짜별 분석결과")
         st.dataframe(
             df_summary,
@@ -2133,6 +2335,7 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+        section_anchor("temp-chart-section")
         st.subheader("📈 온도 추이 그래프")
 
         col1, col2 = st.columns([1, 5])
@@ -2183,6 +2386,7 @@ if uploaded_file is not None:
             with col2:
                 st.pyplot(fig)
 
+        section_anchor("summary-table-section")
         st.subheader("📊 컨테이너별 최저온도 / 냉동효율 / -15℃ 이하 유지율 요약 테이블")
         st.caption(
             "표시 기준: 최저온도 -16℃ 이상 빨간색 / "
@@ -2199,6 +2403,7 @@ if uploaded_file is not None:
         )
 
         st.divider()
+        section_anchor("metric-chart-section")
         st.subheader("📈 일자별 지표 비교 그래프")
         st.caption("커서를 그래프의 선 또는 점에 올리면 해당 컨테이너 정보만 표시됩니다.")
 
