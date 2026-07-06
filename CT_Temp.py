@@ -117,6 +117,26 @@ st.markdown(
         margin-top: 8px;
         margin-bottom: 14px;
     }
+    # Store 버튼 전용 스타일
+    #store-button-anchor + div[data-testid="stButton"] > button {
+        background: #facc15 !important;
+        color: #111827 !important;
+        border: 1px solid #eab308 !important;
+        font-weight: 800 !important;
+    }
+    
+    #store-button-anchor + div[data-testid="stButton"] > button:hover {
+        background: #eab308 !important;
+        color: #111827 !important;
+        border: 1px solid #ca8a04 !important;
+    }
+    
+    #store-button-anchor + div[data-testid="stButton"] > button:focus {
+        background: #facc15 !important;
+        color: #111827 !important;
+        border: 1px solid #ca8a04 !important;
+        box-shadow: 0 0 0 0.2rem rgba(250, 204, 21, 0.35) !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -399,6 +419,8 @@ def render_auto_report_page():
             """,
             unsafe_allow_html=True,
         )
+
+        st.markdown('<div id="store-button-anchor"></div>', unsafe_allow_html=True)
 
         if st.button(
             "💾 Store 실행",
