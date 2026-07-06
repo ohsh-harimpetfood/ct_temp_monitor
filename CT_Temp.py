@@ -103,6 +103,15 @@ if "send_result" not in st.session_state:
 if "send_ok" not in st.session_state:
     st.session_state["send_ok"] = False
 
+if "store_result" not in st.session_state:
+    st.session_state["store_result"] = None
+
+if "store_ok" not in st.session_state:
+    st.session_state["store_ok"] = False
+
+if "store_attempted" not in st.session_state:
+    st.session_state["store_attempted"] = False
+
 if "main_preview_attempted" not in st.session_state:
     st.session_state["main_preview_attempted"] = False
 
@@ -200,6 +209,102 @@ else:
         st.write("우선점검 CT: 해당 없음")
 
     st.divider()
+
+# =========================================================
+# Store / 공식 데이터셋 적재
+# =========================================================
+st.markdown("### Store / 공식 데이터셋 적재")
+st.info(
+    "현재 분석 결과의 daily_summary_rows를 Google Sheet '데이터 다운로드' 시트에 반영합니다. "
+    "중복 기준은 컨테이너 + 측정일자이며, 기존에 있으나 이번 분석에 없는 행은 삭제하지 않습니다."
+)
+
+webhook_ready = bool(webhook_url) and bool(webhook_token)
+payload_ready = report_payload_json is not None
+daily_rows_ready = len(daily_summary_rows_payload) > 0
+can_store_dataset = webhook_ready and payload_ready and daily_rows_ready
+
+col_store_1, col_store_2, col_store_3 = st.columns(3)
+
+with col_store_1:
+    st.metric("적재 대상 rows", f"{len(daily_summary_rows_payload):,}건")
+
+with col_store_2:
+    st.metric("중복 기준", "CT + 측정일자")
+
+with col_store_3:
+    st.metric("대상 시트", "데이터 다운로드")
+
+if not webhook_ready:
+    st.warning("Webhook URL 또는 Token 설정이 없어 Store를 실행할 수 없습니다.")
+
+if not payload_ready:
+    st.warning("보고서 payload가 준비되지 않았습니다. 분석 프로그램에서 CSV 분석을 다시 완료하세요.")
+
+if not daily_rows_ready:
+    st.warning("daily_summary_rows가 비어 있습니다. CSV 분석 결과를 다시 확인하세요.")
+
+if st.button(
+    "💾 Store",
+    key="store_dataset_button",
+    type="secondary",
+    use_container_width=True,
+    disabled=not can_store_dataset,
+):
+    st.session_state["store_attempted"] = True
+    st.session_state["store_result"] = None
+    st.session_state["store_ok"] = False
+
+    with st.spinner("공식 데이터셋에 적재 중입니다..."):
+        store_result = webhook_client.post_report_store(
+            webhook_url=webhook_url,
+            webhook_token=webhook_token,
+            payload=report_payload_json,
+            timeout=90,
+        )
+
+    st.session_state["store_result"] = store_result
+    st.session_state["store_ok"] = bool(store_result.get("ok"))
+
+store_result = st.session_state.get("store_result")
+store_attempted = st.session_state.get("store_attempted", False)
+store_ok = st.session_state.get("store_ok", False)
+
+if store_attempted and store_result is not None:
+    if store_ok:
+        response = store_result.get("response", {})
+        store_info = response.get("store", {})
+
+        st.success("✅ Store 완료: 공식 데이터셋에 반영되었습니다.")
+
+        col_store_r1, col_store_r2, col_store_r3, col_store_r4 = st.columns(4)
+
+        with col_store_r1:
+            st.metric("insert", store_info.get("insert_count", 0))
+
+        with col_store_r2:
+            st.metric("update", store_info.get("update_count", 0))
+
+        with col_store_r3:
+            st.metric("skip", store_info.get("skip_count", 0))
+
+        with col_store_r4:
+            st.metric("valid rows", store_info.get("valid_rows", 0))
+
+        st.caption(
+            f"sheet: {store_info.get('sheet_name', '데이터 다운로드')} / "
+            f"run_id: {store_info.get('ingest_run_id', '-')}"
+        )
+
+    else:
+        st.error("❌ Store 실패")
+
+        error_message = store_result.get("error") or store_result.get("response", {}).get("error")
+        if error_message:
+            st.code(str(error_message))
+
+    if st.checkbox("Store 응답 JSON 보기", key="show_store_result_json"):
+        st.json(store_result)
 
     # =========================================================
     # 자동보고서 생성 / 미리보기
