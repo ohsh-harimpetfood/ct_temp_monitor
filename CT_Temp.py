@@ -61,6 +61,9 @@ if "metrics_payload" not in st.session_state:
 if "data_quality_payload" not in st.session_state:
     st.session_state["data_quality_payload"] = None
 
+if "daily_summary_rows_payload" not in st.session_state:
+    st.session_state["daily_summary_rows_payload"] = None
+
 if "webhook_ping_result" not in st.session_state:
     st.session_state["webhook_ping_result"] = None
 
@@ -161,6 +164,7 @@ else:
     heatmap_rows_payload = st.session_state.get("heatmap_rows_payload") or []
     metrics_payload = st.session_state.get("metrics_payload") or []
     data_quality_payload = st.session_state.get("data_quality_payload") or {}
+    daily_summary_rows_payload = st.session_state.get("daily_summary_rows_payload") or []
     report_payload_json = st.session_state.get("report_payload_json")
 
     st.success("✅ 분석 결과 payload가 준비되어 있습니다.")
@@ -183,6 +187,7 @@ else:
 
     st.caption(
         f"분석기간: {report_meta.get('period_start', '-')} ~ {report_meta.get('period_end', '-')} / "
+        f"daily rows {len(daily_summary_rows_payload)}건 / "
         f"히트맵 {len(heatmap_rows_payload)}건 / "
         f"metrics {len(metrics_payload)}건 / "
         f"유효 데이터 {data_quality_payload.get('valid_count', 0):,}건"
@@ -1886,6 +1891,10 @@ if uploaded_file is not None:
             excluded_count=excluded_count,
         )
 
+        daily_summary_rows_payload = report_payload.build_daily_summary_rows(
+            df_summary=df_summary,
+        )
+        
         report_payload_json = report_payload.build_report_payload(
             mode="draft",
             report_meta=report_meta,
@@ -1894,6 +1903,7 @@ if uploaded_file is not None:
             check_list=check_list_payload,
             metrics=metrics_payload,
             data_quality=data_quality_payload,
+            daily_summary_rows=daily_summary_rows_payload,
         )
 
         current_payload_key = "|".join([
@@ -1901,6 +1911,7 @@ if uploaded_file is not None:
             str(report_meta.get("period_start", "")),
             str(report_meta.get("period_end", "")),
             str(report_meta.get("uploaded_filename", "")),
+            str(len(daily_summary_rows_payload)),
             str(len(heatmap_rows_payload)),
             str(len(check_list_payload)),
             str(len(metrics_payload)),
@@ -1929,6 +1940,7 @@ if uploaded_file is not None:
         st.session_state["check_list_payload"] = check_list_payload
         st.session_state["metrics_payload"] = metrics_payload
         st.session_state["data_quality_payload"] = data_quality_payload
+        st.session_state["daily_summary_rows_payload"] = daily_summary_rows_payload
 
         st.success("✅ 신규 플랫폼 CSV 데이터 불러오기 및 전처리 완료")
 
