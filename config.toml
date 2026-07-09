@@ -1,0 +1,9 @@
+# 프로젝트 루트의 .streamlit/config.toml 로 저장하세요.
+# 다크 테마 고정: 사용자 테마 설정과 무관하게 카드/칩 색상이 항상 올바르게 보입니다.
+
+[theme]
+base = "dark"
+primaryColor = "#3b82f6"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1a1f2b"
+textColor = "#e5e7eb"
